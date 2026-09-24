@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import subprocess
 import sys
@@ -12,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "write-craft"
+EVAL_FIXTURES = ROOT / "evals" / "fixtures"
 EXPECTED_UPSTREAMS = {
     "agent-skills",
     "anthropic-skills",
@@ -37,6 +39,7 @@ REQUIRED_FILES = {
     ROOT / "upstreams.lock.json",
     ROOT / "docs" / "upstream-absorption.md",
     ROOT / "evals" / "cases.json",
+    ROOT / "evals" / "baselines" / "pi-v0.2.0.json",
     SKILL / "SKILL.md",
     SKILL / "VERSION",
     SKILL / "agents" / "openai.yaml",
@@ -55,6 +58,26 @@ def read_json(path: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path.relative_to(ROOT)} must contain a JSON object")
     return payload
+
+
+def canonical_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def run(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
@@ -137,7 +160,7 @@ def validate() -> list[str]:
     if package.get("version") != version:
         errors.append("package.json version must match VERSION")
     if package.get("private") is not True:
-        errors.append("V0.1 package must remain private to prevent accidental publish")
+        errors.append("V0.2 package must remain private to prevent accidental publish")
     if package.get("homepage") != "https://github.com/bigKING67/write-craft#readme":
         errors.append("package homepage must point to the canonical GitHub repository")
     repository = package.get("repository")
@@ -237,13 +260,14 @@ def validate() -> list[str]:
         errors.append(str(exc))
         evals = {}
     cases = evals.get("cases")
-    if evals.get("schema") != "write-craft.behavior-cases.v1":
+    if evals.get("schema") != "write-craft.behavior-cases.v2":
         errors.append("unexpected behavior-cases schema")
-    if not isinstance(cases, list) or len(cases) < 8:
-        errors.append("behavior suite must contain at least eight cases")
+    if not isinstance(cases, list) or len(cases) < 10:
+        errors.append("behavior suite must contain at least ten cases")
     else:
         ids: set[str] = set()
         required_tags: set[str] = set()
+        smoke_cases = 0
         for case in cases:
             if not isinstance(case, dict):
                 errors.append("every behavior case must be an object")
@@ -254,20 +278,114 @@ def validate() -> list[str]:
             else:
                 ids.add(case_id)
             tags = case.get("tags")
-            if isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
+            if (
+                isinstance(tags, list)
+                and tags
+                and all(isinstance(tag, str) and tag.strip() for tag in tags)
+                and len(tags) == len(set(tags))
+            ):
                 required_tags.update(tags)
+            else:
+                errors.append(f"behavior case {case_id!r} has invalid tags")
+            suite = case.get("suite")
+            if suite not in {"smoke", "full"}:
+                errors.append(f"behavior case {case_id!r} has invalid suite")
+            elif suite == "smoke":
+                smoke_cases += 1
+
+            source = case.get("source")
+            source_file = case.get("source_file")
+            has_source = isinstance(source, str) and bool(source.strip())
+            has_source_file = isinstance(source_file, str) and bool(source_file.strip())
+            if has_source == has_source_file:
+                errors.append(
+                    f"behavior case {case_id!r} must define exactly one of source or source_file"
+                )
+            elif has_source_file:
+                fixture = (ROOT / source_file).resolve()
+                try:
+                    fixture.relative_to(EVAL_FIXTURES.resolve())
+                except ValueError:
+                    errors.append(
+                        f"behavior case {case_id!r} source_file escapes evals/fixtures"
+                    )
+                else:
+                    if not fixture.is_file():
+                        errors.append(
+                            f"behavior case {case_id!r} source_file does not exist"
+                        )
             expected = case.get("expected")
             if (
                 not isinstance(case.get("request"), str)
-                or not isinstance(case.get("source"), str)
+                or not case["request"].strip()
                 or not isinstance(expected, dict)
                 or not isinstance(expected.get("must"), list)
                 or not isinstance(expected.get("must_not"), list)
             ):
                 errors.append(f"behavior case {case_id!r} has an incomplete contract")
+            elif any(
+                not values
+                or not all(isinstance(value, str) and value.strip() for value in values)
+                or len(values) != len(set(values))
+                for values in (expected["must"], expected["must_not"])
+            ):
+                errors.append(f"behavior case {case_id!r} has invalid expectations")
         for tag in {"rewrite", "diagnose", "evidence", "routing", "reader-test"}:
             if tag not in required_tags:
                 errors.append(f"behavior suite is missing required coverage tag: {tag}")
+        if smoke_cases != 4:
+            errors.append("behavior suite must contain exactly four smoke cases")
+
+    try:
+        baseline = read_json(ROOT / "evals" / "baselines" / "pi-v0.2.0.json")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        baseline = {}
+    if baseline.get("schema") != "write-craft.behavior-baseline.v1":
+        errors.append("unexpected behavior baseline schema")
+    if baseline.get("version") != version:
+        errors.append("behavior baseline version must match VERSION")
+    provenance = baseline.get("provenance")
+    if not isinstance(provenance, dict):
+        errors.append("behavior baseline provenance must be an object")
+    else:
+        if provenance.get("skill_sha256") != tree_digest(SKILL):
+            errors.append("behavior baseline skill_sha256 does not match the current Skill")
+        if provenance.get("independent_contexts") is not True:
+            errors.append("behavior baseline must record independent contexts")
+        if provenance.get("cross_model_verification") is not False:
+            errors.append("behavior baseline must not overclaim cross-model verification")
+    baseline_results = baseline.get("results")
+    if not isinstance(baseline_results, list) or len(baseline_results) != 5:
+        errors.append("behavior baseline must contain five evaluated results")
+    else:
+        result_ids = [result.get("case_id") for result in baseline_results if isinstance(result, dict)]
+        expected_result_ids = {
+            "ai-video-proposal-rewrite": 1,
+            "diagnosis-does-not-overwrite": 1,
+            "routing-boundaries": 1,
+            "decision-entry-preserves-engineering-source": 2,
+        }
+        if {case_id: result_ids.count(case_id) for case_id in set(result_ids)} != expected_result_ids:
+            errors.append("behavior baseline does not cover the required smoke and repeat cases")
+        for result in baseline_results:
+            if not isinstance(result, dict) or result.get("status") != "PASS":
+                errors.append("every behavior baseline result must be PASS")
+                continue
+            candidate = result.get("candidate")
+            judgment = result.get("judgment")
+            if not isinstance(candidate, str) or not candidate.strip():
+                errors.append("behavior baseline candidate must be non-empty")
+            elif result.get("candidate_sha256") != sha256_text(candidate):
+                errors.append("behavior baseline candidate_sha256 mismatch")
+            if (
+                not isinstance(judgment, dict)
+                or judgment.get("schema") != "write-craft.judgment.v1"
+                or judgment.get("status") != "PASS"
+            ):
+                errors.append("behavior baseline judgment must be a PASS judgment.v1")
+            elif result.get("judgment_sha256") != sha256_text(canonical_json(judgment)):
+                errors.append("behavior baseline judgment_sha256 mismatch")
 
     for path in product_text_files():
         text = path.read_text(encoding="utf-8")

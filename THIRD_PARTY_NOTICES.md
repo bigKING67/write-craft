@@ -10,7 +10,7 @@ package. No absence of an explicit license is interpreted as permission to copy.
   truth-preserving explanation guidance was informed by this source. The
   upstream license is reproduced in `LICENSES/agent-skills-MIT.txt`.
 - **Anthropic, `skills`, `internal-comms`** — Apache-2.0 at the source path.
-  It is retained as a format reference; V0.1 does not copy its examples.
+  It is retained as a format reference; V0.2 does not copy its examples.
 
 ## Reference-only or independently re-expressed sources
 
@@ -23,7 +23,7 @@ package. No absence of an explicit license is interpreted as permission to copy.
   language-neutral composition principles.
 - **ComposioHQ, `awesome-claude-skills`, `content-research-writer`** — the
   reviewed repository does not expose a repository-level license. It remains
-  reference-only and contributes no copied text to V0.1.
+  reference-only and contributes no copied text to V0.2.
 
 Exact revisions and path-level decisions are recorded in
 `upstreams.lock.json` and `docs/upstream-absorption.md`.

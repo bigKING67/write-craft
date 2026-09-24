@@ -4,7 +4,7 @@ This repository ships exactly one installable product: `skills/write-craft/`.
 Root-level files exist for source governance, evaluation, validation, and
 packaging; they must not become runtime requirements for the installed Skill.
 
-## V0.1 boundary
+## V0.2 boundary
 
 - Turn complex technical proposals and project material into decision-ready
   documents for non-technical readers, with Simplified Chinese as the default
@@ -12,7 +12,7 @@ packaging; they must not become runtime requirements for the installed Skill.
 - Preserve evidence, uncertainty, constraints, trade-offs, and the difference
   between planned, implemented, and verified behavior.
 - Do not absorb advertising copy, product UI microcopy, document-platform
-  operations, or developer/API documentation into the V0.1 trigger surface.
+  operations, or developer/API documentation into the V0.2 trigger surface.
 - Prefer a useful complete draft when the supplied material is sufficient.
   Ask only for missing information that can change the decision, scope, cost,
   acceptance, or material risk.

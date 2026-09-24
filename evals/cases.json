@@ -1,8 +1,9 @@
 {
-  "schema": "write-craft.behavior-cases.v1",
+  "schema": "write-craft.behavior-cases.v2",
   "cases": [
     {
       "id": "ai-video-proposal-rewrite",
+      "suite": "smoke",
       "tags": ["rewrite", "evidence"],
       "request": "把这份 AI 剪辑工程方案改成老板能理解并决策的项目文档，先给完整稿。",
       "source": "方案描述多模态解析、视频检索、Agent 编排和渲染，但没有预算、工期、效率基线或试点门槛。",
@@ -22,6 +23,7 @@
     },
     {
       "id": "sufficient-source-no-repeat-questions",
+      "suite": "full",
       "tags": ["rewrite"],
       "request": "按材料直接改写，已有信息不要重复问。",
       "source": "材料已明确读者、问题、建议、范围、人员、四周周期、预算上限、验收方法、风险和需要批准的试点。",
@@ -38,6 +40,7 @@
     },
     {
       "id": "critical-gaps-with-draft",
+      "suite": "full",
       "tags": ["rewrite", "evidence"],
       "request": "先改成可讨论的老板版，缺什么就标出来。",
       "source": "建议上线一个客服辅助系统，目标是缩短响应时间；尚无当前响应基线、负责人和预算。",
@@ -56,6 +59,7 @@
     },
     {
       "id": "status-update-without-fake-approval",
+      "suite": "full",
       "tags": ["rewrite", "routing"],
       "request": "把这份阶段进展改得让管理层容易看懂。",
       "source": "本周完成接口联调和本地测试，下周处理监控；当前没有需要管理层审批或协调的事项。",
@@ -72,6 +76,7 @@
     },
     {
       "id": "decision-changing-technical-constraint",
+      "suite": "full",
       "tags": ["rewrite", "evidence"],
       "request": "技术细节尽量放附录，但别影响决策。",
       "source": "首期只能处理已授权素材；实时生成需要额外 GPU 预算；系统仍需人工审核。",
@@ -88,6 +93,7 @@
     },
     {
       "id": "plain-language-preserves-precision",
+      "suite": "full",
       "tags": ["rewrite", "evidence"],
       "request": "把这段写成人话，但不要讲错。",
       "source": "在 2026 年 9 月的 120 个已缓存查询样本中，中位读取延迟从 180ms 降至 70ms；未测试写入和缓存未命中。",
@@ -105,6 +111,7 @@
     },
     {
       "id": "diagnosis-does-not-overwrite",
+      "suite": "smoke",
       "tags": ["diagnose"],
       "request": "先告诉我老板为什么可能看不懂，不要重写全文。",
       "source": "原稿先列模型、数据库、状态机和接口，最后一段才说明想减少人工找素材时间。",
@@ -122,6 +129,7 @@
     },
     {
       "id": "routing-boundaries",
+      "suite": "smoke",
       "tags": ["routing"],
       "request": "分别判断这些请求是否应由 write-craft 主导：广告标题、按钮报错文案、飞书权限设置、API 参考、老板版立项方案。",
       "source": "五个请求只有最后一个要求把复杂方案写给非技术决策者。",
@@ -138,6 +146,7 @@
     },
     {
       "id": "reader-test-evidence-boundary",
+      "suite": "full",
       "tags": ["reader-test", "evidence"],
       "request": "最后做独立读者测试；如果当前不能真正独立测试，就给我测试提示词。",
       "source": "最终文档包含建议、范围、验收、风险和待决事项。",
@@ -150,6 +159,28 @@
         "must_not": [
           "在同一上下文自测后声称独立通过",
           "向测试读者泄露预期答案"
+        ]
+      }
+    },
+    {
+      "id": "decision-entry-preserves-engineering-source",
+      "suite": "smoke",
+      "tags": ["rewrite", "evidence", "structure"],
+      "request": "保留完整技术方案作为工程实施依据，另外给老板和业务一份能独立看懂的短版。静态对照信息用文档内表格，不要嵌入电子表格。",
+      "source_file": "evals/fixtures/ai-video-long-plan.md",
+      "expected": {
+        "must": [
+          "交付一份可独立阅读的短版，说明建议、实际使用流程、首期交付、验收、不做什么、待确认项和通过后的下一步",
+          "保留完整工程方案并从短版链接或明确指向它",
+          "在短版保留会改变范围、成本、风险或验收的限制",
+          "把周期、人员、预算和最终通过阈值标为待确认",
+          "用交付文档的原生表格呈现静态对照信息"
+        ],
+        "must_not": [
+          "删除或用短版覆盖完整工程方案",
+          "把六类任务、批量产能或生成式替换写成首期承诺",
+          "编造周期、人员、预算或通过阈值",
+          "为静态对照信息嵌入电子表格"
         ]
       }
     }

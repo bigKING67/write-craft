@@ -6,12 +6,12 @@ without any upstream checkout.
 | Upstream | Reviewed capability | Local decision | Local expression |
 | --- | --- | --- | --- |
 | Anthropic `doc-coauthoring` | Context gathering, iterative structure, fresh-reader testing | Partial, independently expressed | `SKILL.md`, `reader-testing.md` |
-| Anthropic `internal-comms` | Internal communication formats | Reference only for a later release | None in V0.1 |
+| Anthropic `internal-comms` | Internal communication formats | Reference only for a later release | None in V0.2 |
 | `writing-clearly-and-concisely` | Topic-focused paragraphs, concrete language, concision | Language-neutral principles only | `clear-chinese.md` |
-| Composio `content-research-writer` | Research-assisted articles and section feedback | Reference only; outside V0.1 | None in V0.1 |
+| Composio `content-research-writer` | Research-assisted articles and section feedback | Reference only; outside V0.2 | None in V0.2 |
 | Arjun `plain-language` | Explain technical material without deleting precision or uncertainty | Selectively absorbed under MIT | `decision-documents.md`, `clear-chinese.md` |
 
-V0.1 also consulted the public Microsoft guidance on scannable content and the
+V0.2 also consulted the public Microsoft guidance on scannable content and the
 Google developer documentation accessibility guidance. They inform general
 scannability checks but are not vendored repositories or runtime dependencies.
 

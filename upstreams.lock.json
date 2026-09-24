@@ -46,7 +46,7 @@
         "content-research-writer/SKILL.md": "reference_only"
       },
       "local_coverage": [],
-      "notes": "Public-article research, hooks, and section-by-section coaching are outside the V0.1 decision-document core. Example citations are not evidence and are not reused."
+      "notes": "Public-article research, hooks, and section-by-section coaching are outside the V0.2 decision-document core. Example citations are not evidence and are not reused."
     },
     "agent-skills": {
       "repo": "https://github.com/arjunprabhulal/agent-skills.git",

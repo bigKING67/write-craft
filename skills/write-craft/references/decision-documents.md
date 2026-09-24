@@ -44,6 +44,21 @@ A scanning reader should be able to find, near the beginning:
 Write the summary after the body is sound, even though it appears first. A
 summary is not a teaser: it should contain the conclusion.
 
+## Separate the decision entry from the engineering source when needed
+
+When one document must serve both decision-makers and implementers, a short
+summary at the top may still leave the first reading path too long. If the
+existing engineering plan must remain complete, preserve it as the detailed
+source and create a shorter decision entry that can stand on its own. The short
+entry should contain the recommendation, one representative workflow, the
+bounded first-stage deliverable and acceptance method, explicit non-goals,
+material unknowns, and the next decision or action. Link to the detailed source
+for architecture and implementation mechanics instead of copying them all.
+
+Do not use the split to hide a constraint. Any fact that changes feasibility,
+cost, timing, risk, acceptance, or the requested authorization must still
+appear in the decision entry.
+
 ## Use a complete scenario
 
 When an architecture description is too abstract, show one representative flow:
@@ -75,6 +90,16 @@ Choose only the sections the decision requires. Useful candidates include:
 Use consistent criteria when comparing options. Do not praise one option for
 speed and reject another for cost without showing both criteria for both
 options.
+
+## Use the lightest table that fits the reader's task
+
+For a small, static comparison such as scope, stages, responsibilities, or
+acceptance criteria, use the destination document's native table when it makes
+scanning easier. Introduce a spreadsheet or another embedded data artifact only
+when the task actually needs formulas, live data, filtering, calculation, or
+independent data collaboration. A more powerful container is not automatically
+a clearer one; it can add navigation, access, and maintenance overhead without
+helping the decision.
 
 ## Keep decision-changing constraints visible
 

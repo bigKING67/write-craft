@@ -38,12 +38,14 @@ class RepositoryContractTests(unittest.TestCase):
     def test_behavior_contract_covers_core_failure_modes(self) -> None:
         payload = json.loads((ROOT / "evals" / "cases.json").read_text(encoding="utf-8"))
         cases = payload["cases"]
+        case_ids = {case["id"] for case in cases}
         tags = {tag for case in cases for tag in case["tags"]}
         self.assertTrue({"rewrite", "diagnose", "evidence", "routing", "reader-test"} <= tags)
+        self.assertIn("decision-entry-preserves-engineering-source", case_ids)
         prohibited = " ".join(
             item for case in cases for item in case["expected"]["must_not"]
         )
-        for invariant in ("编造", "生产上线", "独立通过", "飞书写入"):
+        for invariant in ("编造", "生产上线", "独立通过", "飞书写入", "嵌入电子表格"):
             self.assertIn(invariant, prohibited)
 
 

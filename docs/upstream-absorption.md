@@ -5,10 +5,10 @@ unchanged under `upstreams/`; reviewed behavior is independently expressed in
 the installable Skill. A source is not considered absorbed merely because its
 repository is pinned.
 
-| Source | Decision | V0.1 use | Deliberately not adopted |
+| Source | Decision | V0.2 use | Deliberately not adopted |
 | --- | --- | --- | --- |
 | Anthropic `doc-coauthoring` | Partial, independent re-expression | Context-aware drafting and fresh-reader testing | Mandatory opt-in, 5–10 questions by default, section-by-section ceremony, host-specific artifact commands |
-| Anthropic `internal-comms` | Reference only | Future format vocabulary | Weekly updates, newsletters, incident templates in the V0.1 trigger surface |
+| Anthropic `internal-comms` | Reference only | Future format vocabulary | Weekly updates, newsletters, incident templates in the V0.2 trigger surface |
 | `writing-clearly-and-concisely` | Partial, principles only | One topic per paragraph, concrete language, remove waste | English punctuation and grammar rules, universal active-voice enforcement, mandatory subagent copyedit |
 | Composio `content-research-writer` | Reference only | Future public-article research review | Hook optimization, publishing checklist, invented example citations, broad blog routing |
 | Arjun `plain-language` | Selective absorption | Preserve truth while translating jargon and the reader's path | English-specific sentence examples as reusable copy |
