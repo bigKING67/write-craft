@@ -46,6 +46,16 @@ class RepositoryContractTests(unittest.TestCase):
         tags = {tag for case in cases for tag in case["tags"]}
         self.assertTrue({"rewrite", "diagnose", "evidence", "routing", "reader-test"} <= tags)
         self.assertIn("decision-entry-preserves-engineering-source", case_ids)
+        length_case = next(
+            case for case in cases if case["id"] == "strict-total-length-budget"
+        )
+        self.assertEqual(length_case["limits"], {"max_han_characters": 500})
+        self.assertTrue(
+            any("附注" in item for item in length_case["expected"]["must_not"])
+        )
+        self.assertTrue(
+            any("责任人" in item for item in length_case["expected"]["must_not"])
+        )
         prohibited = " ".join(
             item for case in cases for item in case["expected"]["must_not"]
         )
@@ -73,10 +83,12 @@ class RepositoryContractTests(unittest.TestCase):
 
     def test_source_validator_rejects_incomplete_behavior_baseline(self) -> None:
         original_read_json = source_validator.read_json
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        baseline_path = ROOT / "evals" / "baselines" / f"pi-v{version}.json"
 
         def read_without_one_result(path: Path) -> dict[str, object]:
             payload = original_read_json(path)
-            if path == ROOT / "evals" / "baselines" / "pi-v0.2.0.json":
+            if path == baseline_path:
                 payload = deepcopy(payload)
                 results = payload["results"]
                 self.assertIsInstance(results, list)
@@ -87,6 +99,44 @@ class RepositoryContractTests(unittest.TestCase):
             errors = source_validator.validate()
         self.assertTrue(
             any("exactly one result for every current case" in error for error in errors),
+            errors,
+        )
+
+    def test_source_validator_rejects_overlength_behavior_candidate(self) -> None:
+        original_read_json = source_validator.read_json
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        baseline_path = ROOT / "evals" / "baselines" / f"pi-v{version}.json"
+
+        def read_with_overlength_candidate(path: Path) -> dict[str, object]:
+            payload = original_read_json(path)
+            if path == baseline_path:
+                payload = deepcopy(payload)
+                results = payload["results"]
+                self.assertIsInstance(results, list)
+                result = next(
+                    item
+                    for item in results
+                    if item["case_id"] == "strict-total-length-budget"
+                )
+                result["candidate"] += "超" * 500
+                result["candidate_sha256"] = source_validator.sha256_text(
+                    result["candidate"]
+                )
+                result["candidate_metrics"] = {
+                    "han_characters": source_validator.han_character_count(
+                        result["candidate"]
+                    )
+                }
+            return payload
+
+        with patch.object(
+            source_validator,
+            "read_json",
+            side_effect=read_with_overlength_candidate,
+        ):
+            errors = source_validator.validate()
+        self.assertTrue(
+            any("exceeds max_han_characters" in error for error in errors),
             errors,
         )
 

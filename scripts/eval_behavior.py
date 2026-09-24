@@ -46,6 +46,40 @@ def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def han_character_count(value: str) -> int:
+    return len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", value))
+
+
+def candidate_limit_issues(case: dict[str, Any], candidate: str) -> list[str]:
+    limits = case.get("limits")
+    if not isinstance(limits, dict):
+        return []
+    maximum = limits.get("max_han_characters")
+    if type(maximum) is not int or maximum < 1:
+        return []
+    actual = han_character_count(candidate)
+    if actual <= maximum:
+        return []
+    return [
+        f"完整输出包含 {actual} 个汉字，超过 max_han_characters={maximum}；"
+        "标题、表格、附注和说明均计入"
+    ]
+
+
+def apply_deterministic_checks(
+    judgment: dict[str, Any], case: dict[str, Any], candidate: str
+) -> dict[str, Any]:
+    issues = candidate_limit_issues(case, candidate)
+    if not issues:
+        return judgment
+    blocking = judgment["blocking_issues"]
+    for issue in issues:
+        if issue not in blocking:
+            blocking.append(issue)
+    judgment["status"] = "FAIL"
+    return judgment
+
+
 def skill_digest(skill_root: Path = SKILL_ROOT) -> str:
     digest = hashlib.sha256()
     for path in sorted(skill_root.rglob("*")):
@@ -108,6 +142,16 @@ def validate_payload(payload: object, root: Path = ROOT) -> list[str]:
             errors.append(f"{case_id}.tags must be unique non-empty strings")
         if not isinstance(case.get("request"), str) or not case["request"].strip():
             errors.append(f"{case_id}.request must be a non-empty string")
+        limits = case.get("limits")
+        if limits is not None and (
+            not isinstance(limits, dict)
+            or set(limits) != {"max_han_characters"}
+            or type(limits.get("max_han_characters")) is not int
+            or limits["max_han_characters"] < 1
+        ):
+            errors.append(
+                f"{case_id}.limits must contain one positive max_han_characters integer"
+            )
 
         has_source = isinstance(case.get("source"), str) and bool(case["source"].strip())
         has_source_file = isinstance(case.get("source_file"), str) and bool(
@@ -290,6 +334,7 @@ def generator_prompt(case: dict[str, Any], source: str) -> str:
 
 def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
     contract = json.dumps(case["expected"], ensure_ascii=False, indent=2)
+    limits = json.dumps(case.get("limits", {}), ensure_ascii=False, indent=2)
     return f"""你是一个独立的文档行为验收员。你没有参与候选稿的生成，只能根据本消息中的请求、原始材料、候选稿和验收合同判分。不要重写候选稿。
 
 判分规则：
@@ -323,6 +368,9 @@ JSON 结构：
 
 【验收合同】
 {contract}
+
+【确定性长度限制】
+{limits}
 """
 
 
@@ -487,6 +535,10 @@ def evaluate_case(
     (case_dir / "candidate.md").write_text(candidate + "\n", encoding="utf-8")
     result["generator"]["message"] = safe_message_metadata(final["message"])
     result["candidate_sha256"] = sha256_text(candidate)
+    if isinstance(case.get("limits"), dict):
+        result["candidate_metrics"] = {
+            "han_characters": han_character_count(candidate)
+        }
 
     judged = run_command(
         pi_args(
@@ -517,6 +569,7 @@ def evaluate_case(
     try:
         judge_final = extract_final_assistant(judged["stdout"])
         judgment = parse_judgment(judge_final["text"], case)
+        judgment = apply_deterministic_checks(judgment, case, candidate)
     except ContractError as exc:
         result["error"] = str(exc)
         write_json(case_dir / "result.json", result)
@@ -609,6 +662,10 @@ def rejudge_case(
         },
         "status": "ERROR",
     }
+    if isinstance(case.get("limits"), dict):
+        result["candidate_metrics"] = {
+            "han_characters": han_character_count(candidate)
+        }
     if judged["timed_out"]:
         result["error"] = "judge timed out"
     elif judged["returncode"] != 0:
@@ -617,6 +674,7 @@ def rejudge_case(
         try:
             judge_final = extract_final_assistant(judged["stdout"])
             judgment = parse_judgment(judge_final["text"], case)
+            judgment = apply_deterministic_checks(judgment, case, candidate)
         except ContractError as exc:
             result["error"] = str(exc)
         else:

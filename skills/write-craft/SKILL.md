@@ -35,6 +35,15 @@ Before drafting, determine from the supplied material:
 4. the evidence and constraints that support or limit it;
 5. the requested deliverable, length, tone, and platform constraints.
 
+Treat an explicit length limit as a hard deliverable constraint. Unless the
+user limits only a named section, the limit applies to the entire user-visible
+answer, including titles, headings, table text, appendices, notes, caveats,
+change explanations, and unresolved items. Budget space across those parts;
+do not exceed the limit and then label the overflow as outside the “main text”.
+Compress structure and wording before dropping decision-changing evidence. If
+the critical facts still cannot fit, surface that conflict instead of silently
+omitting them or overrunning the limit.
+
 Do not repeat questions whose answers are already present. Ask only when a
 missing answer can materially change the conclusion, scope, cost, acceptance,
 or risk. Group at most three critical questions. If work can proceed safely,

@@ -7,8 +7,11 @@ from pathlib import Path
 
 from scripts.eval_behavior import (
     ContractError,
+    apply_deterministic_checks,
+    candidate_limit_issues,
     canonical_json,
     extract_final_assistant,
+    han_character_count,
     judge_prompt,
     parse_judgment,
     rejudge_case,
@@ -48,6 +51,22 @@ class BehaviorEvaluationTests(unittest.TestCase):
                 root,
             )
             self.assertTrue(any("evals/fixtures" in error for error in errors), errors)
+
+            limited_case = sample_case()
+            limited_case["limits"] = {"max_han_characters": 500}
+            self.assertEqual(
+                validate_payload(
+                    {"schema": "write-craft.behavior-cases.v2", "cases": [limited_case]},
+                    root,
+                ),
+                [],
+            )
+            limited_case["limits"] = {"max_han_characters": True}
+            errors = validate_payload(
+                {"schema": "write-craft.behavior-cases.v2", "cases": [limited_case]},
+                root,
+            )
+            self.assertTrue(any("max_han_characters" in error for error in errors), errors)
 
     def test_suite_selection_and_explicit_cases(self) -> None:
         smoke = sample_case()
@@ -118,6 +137,32 @@ class BehaviorEvaluationTests(unittest.TestCase):
         prompt = judge_prompt(sample_case(), "原始材料", "候选稿")
         self.assertIn("status 表示候选稿是否符合该条合同", prompt)
         self.assertIn("候选稿没有编造时，status 必须是 PASS", prompt)
+
+        limited_case = sample_case()
+        limited_case["limits"] = {"max_han_characters": 500}
+        prompt = judge_prompt(limited_case, "原始材料", "候选稿")
+        self.assertIn('"max_han_characters": 500', prompt)
+
+    def test_deterministic_length_limit_counts_the_whole_candidate(self) -> None:
+        case = sample_case()
+        case["limits"] = {"max_han_characters": 4}
+        candidate = "正文四字\n\n附注两字"
+        self.assertEqual(han_character_count(candidate), 8)
+        issues = candidate_limit_issues(case, candidate)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("8 个汉字", issues[0])
+
+        judgment = {
+            "schema": "write-craft.judgment.v1",
+            "case_id": "sample",
+            "status": "PASS",
+            "must": [],
+            "must_not": [],
+            "blocking_issues": [],
+        }
+        checked = apply_deterministic_checks(judgment, case, candidate)
+        self.assertEqual(checked["status"], "FAIL")
+        self.assertEqual(checked["blocking_issues"], issues)
 
     def test_rejudge_requires_existing_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:

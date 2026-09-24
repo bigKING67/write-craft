@@ -54,6 +54,21 @@ Do not delete or silently strengthen:
 Use “预计”“目标”“假设”“待验证” only when those are the true evidence states.
 Avoid decorative hedging; uncertainty should be specific enough to act on.
 
+## Keep the whole answer within a hard length limit
+
+When the user gives an exact limit, apply it to every user-visible part unless
+the user explicitly narrows the limit to a named section. Titles, headings,
+table-cell text, appendices, notes, caveats, explanations of changes, and
+follow-up items all consume the same budget. Do not call a section “正文” and
+then place overflow below it.
+
+Count conservatively and leave margin instead of drafting to the exact edge.
+Shorten headings, remove repeated conclusions, flatten low-value structure,
+and combine compatible qualifications before removing a fact that changes the
+decision. If the requested limit cannot contain the recommendation plus its
+material evidence, constraints, and risk, make that trade-off explicit rather
+than silently exceeding the limit or deleting the boundary.
+
 ## Remove abstract filler
 
 Words such as “赋能”“抓手”“闭环”“智能化”“全链路”“全面提升” are not forbidden,
