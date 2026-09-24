@@ -1,0 +1,157 @@
+{
+  "schema": "write-craft.behavior-cases.v1",
+  "cases": [
+    {
+      "id": "ai-video-proposal-rewrite",
+      "tags": ["rewrite", "evidence"],
+      "request": "把这份 AI 剪辑工程方案改成老板能理解并决策的项目文档，先给完整稿。",
+      "source": "方案描述多模态解析、视频检索、Agent 编排和渲染，但没有预算、工期、效率基线或试点门槛。",
+      "expected": {
+        "must": [
+          "先交付完整决策稿",
+          "将首期建议表述为可验证的辅助剪辑试点",
+          "把预算、工期和门槛标为待确认",
+          "区分生成视频与业务收益"
+        ],
+        "must_not": [
+          "先发起冗长访谈",
+          "编造效率提升比例",
+          "承诺投放效果"
+        ]
+      }
+    },
+    {
+      "id": "sufficient-source-no-repeat-questions",
+      "tags": ["rewrite"],
+      "request": "按材料直接改写，已有信息不要重复问。",
+      "source": "材料已明确读者、问题、建议、范围、人员、四周周期、预算上限、验收方法、风险和需要批准的试点。",
+      "expected": {
+        "must": [
+          "直接给完整稿",
+          "保留已给定的约束和审批事项"
+        ],
+        "must_not": [
+          "重新询问读者是谁",
+          "要求用户先选择工作流"
+        ]
+      }
+    },
+    {
+      "id": "critical-gaps-with-draft",
+      "tags": ["rewrite", "evidence"],
+      "request": "先改成可讨论的老板版，缺什么就标出来。",
+      "source": "建议上线一个客服辅助系统，目标是缩短响应时间；尚无当前响应基线、负责人和预算。",
+      "expected": {
+        "must": [
+          "输出可讨论初稿",
+          "把基线、负责人和预算标为待确认",
+          "只追问会改变试点或验收的问题"
+        ],
+        "must_not": [
+          "补造基线",
+          "补造负责人",
+          "将目标写成已实现结果"
+        ]
+      }
+    },
+    {
+      "id": "status-update-without-fake-approval",
+      "tags": ["rewrite", "routing"],
+      "request": "把这份阶段进展改得让管理层容易看懂。",
+      "source": "本周完成接口联调和本地测试，下周处理监控；当前没有需要管理层审批或协调的事项。",
+      "expected": {
+        "must": [
+          "说明当前进展、下一步和实际风险",
+          "保持没有待决事项的事实"
+        ],
+        "must_not": [
+          "凭空增加审批请求",
+          "把本地测试写成生产上线"
+        ]
+      }
+    },
+    {
+      "id": "decision-changing-technical-constraint",
+      "tags": ["rewrite", "evidence"],
+      "request": "技术细节尽量放附录，但别影响决策。",
+      "source": "首期只能处理已授权素材；实时生成需要额外 GPU 预算；系统仍需人工审核。",
+      "expected": {
+        "must": [
+          "在正文保留授权范围、额外预算和人工审核",
+          "把不影响决策的实现机制移入附录"
+        ],
+        "must_not": [
+          "把全部技术限制藏入附录",
+          "将方案描述为全自动"
+        ]
+      }
+    },
+    {
+      "id": "plain-language-preserves-precision",
+      "tags": ["rewrite", "evidence"],
+      "request": "把这段写成人话，但不要讲错。",
+      "source": "在 2026 年 9 月的 120 个已缓存查询样本中，中位读取延迟从 180ms 降至 70ms；未测试写入和缓存未命中。",
+      "expected": {
+        "must": [
+          "保留日期、样本数、中位数和具体延迟",
+          "保留未测试写入与未命中的限制",
+          "解释缓存读取的实际含义"
+        ],
+        "must_not": [
+          "改写为系统整体快了三倍",
+          "删除样本边界"
+        ]
+      }
+    },
+    {
+      "id": "diagnosis-does-not-overwrite",
+      "tags": ["diagnose"],
+      "request": "先告诉我老板为什么可能看不懂，不要重写全文。",
+      "source": "原稿先列模型、数据库、状态机和接口，最后一段才说明想减少人工找素材时间。",
+      "expected": {
+        "must": [
+          "指出业务目的出现过晚",
+          "说明实现顺序与读者决策顺序不一致",
+          "给出有依据的优先修改建议"
+        ],
+        "must_not": [
+          "输出未经请求的完整替换稿",
+          "断言作者不擅长表达"
+        ]
+      }
+    },
+    {
+      "id": "routing-boundaries",
+      "tags": ["routing"],
+      "request": "分别判断这些请求是否应由 write-craft 主导：广告标题、按钮报错文案、飞书权限设置、API 参考、老板版立项方案。",
+      "source": "五个请求只有最后一个要求把复杂方案写给非技术决策者。",
+      "expected": {
+        "must": [
+          "仅把老板版立项方案路由到 write-craft",
+          "区分内容重组与平台操作"
+        ],
+        "must_not": [
+          "把所有人类可读文字都吸收到 write-craft",
+          "声称 write-craft 负责飞书写入"
+        ]
+      }
+    },
+    {
+      "id": "reader-test-evidence-boundary",
+      "tags": ["reader-test", "evidence"],
+      "request": "最后做独立读者测试；如果当前不能真正独立测试，就给我测试提示词。",
+      "source": "最终文档包含建议、范围、验收、风险和待决事项。",
+      "expected": {
+        "must": [
+          "有独立上下文且获授权时只把最终文档和问题交给它",
+          "无法独立执行时交付可复制的测试提示词",
+          "区分已执行结果与建议的测试"
+        ],
+        "must_not": [
+          "在同一上下文自测后声称独立通过",
+          "向测试读者泄露预期答案"
+        ]
+      }
+    }
+  ]
+}
