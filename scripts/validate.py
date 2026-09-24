@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -46,6 +47,7 @@ REQUIRED_FILES = {
 }
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 PUBLIC_HOME = re.compile(
     r"(?:/Users/[A-Za-z0-9._-]+/|/home/[A-Za-z0-9._-]+/|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+\\)"
 )
@@ -78,6 +80,23 @@ def tree_digest(root: Path) -> str:
         digest.update(path.read_bytes())
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def behavior_case_digest(case: dict[str, object]) -> str:
+    source = case.get("source")
+    source_file = case.get("source_file")
+    has_source = isinstance(source, str) and bool(source.strip())
+    has_source_file = isinstance(source_file, str) and bool(source_file.strip())
+    if has_source == has_source_file:
+        raise ValueError("behavior case must define exactly one source")
+    if has_source_file:
+        fixture = (ROOT / source_file).resolve()
+        try:
+            fixture.relative_to(EVAL_FIXTURES.resolve())
+        except ValueError as exc:
+            raise ValueError("behavior case source_file escapes evals/fixtures") from exc
+        source = fixture.read_text(encoding="utf-8")
+    return sha256_text(canonical_json({"case": case, "source": source}))
 
 
 def run(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
@@ -262,6 +281,8 @@ def validate() -> list[str]:
     cases = evals.get("cases")
     if evals.get("schema") != "write-craft.behavior-cases.v2":
         errors.append("unexpected behavior-cases schema")
+    current_cases: dict[str, dict[str, object]] = {}
+    current_case_digests: dict[str, str] = {}
     if not isinstance(cases, list) or len(cases) < 10:
         errors.append("behavior suite must contain at least ten cases")
     else:
@@ -277,6 +298,7 @@ def validate() -> list[str]:
                 errors.append("behavior case ids must be non-empty and unique")
             else:
                 ids.add(case_id)
+                current_cases[case_id] = case
             tags = case.get("tags")
             if (
                 isinstance(tags, list)
@@ -330,6 +352,11 @@ def validate() -> list[str]:
                 for values in (expected["must"], expected["must_not"])
             ):
                 errors.append(f"behavior case {case_id!r} has invalid expectations")
+            if isinstance(case_id, str) and case_id in current_cases:
+                try:
+                    current_case_digests[case_id] = behavior_case_digest(case)
+                except (OSError, ValueError) as exc:
+                    errors.append(f"behavior case {case_id!r} digest failed: {exc}")
         for tag in {"rewrite", "diagnose", "evidence", "routing", "reader-test"}:
             if tag not in required_tags:
                 errors.append(f"behavior suite is missing required coverage tag: {tag}")
@@ -345,6 +372,7 @@ def validate() -> list[str]:
         errors.append("unexpected behavior baseline schema")
     if baseline.get("version") != version:
         errors.append("behavior baseline version must match VERSION")
+    raw_artifact_roots: list[str] = []
     provenance = baseline.get("provenance")
     if not isinstance(provenance, dict):
         errors.append("behavior baseline provenance must be an object")
@@ -355,23 +383,122 @@ def validate() -> list[str]:
             errors.append("behavior baseline must record independent contexts")
         if provenance.get("cross_model_verification") is not False:
             errors.append("behavior baseline must not overclaim cross-model verification")
+        if provenance.get("run_mode") not in {
+            "single_full_run",
+            "segmented_full_with_explicit_rejudge",
+        }:
+            errors.append("behavior baseline must declare an accepted full-suite run mode")
+        raw_artifact_roots = provenance.get("raw_artifact_roots")
+        if (
+            not isinstance(raw_artifact_roots, list)
+            or not raw_artifact_roots
+            or len(raw_artifact_roots) != len(set(raw_artifact_roots))
+            or not all(
+                isinstance(path, str)
+                and path.startswith(".artifacts/write-craft-evals/")
+                and ".." not in Path(path).parts
+                for path in raw_artifact_roots
+            )
+        ):
+            errors.append("behavior baseline raw artifact roots must be unique eval paths")
+            raw_artifact_roots = []
+    acceptance = baseline.get("acceptance")
+    expected_full_result = f"{len(current_cases)}/{len(current_cases)} PASS"
+    if (
+        not isinstance(acceptance, dict)
+        or acceptance.get("full_cases") != expected_full_result
+    ):
+        errors.append(
+            "behavior baseline acceptance must record every current case as PASS"
+        )
     baseline_results = baseline.get("results")
-    if not isinstance(baseline_results, list) or len(baseline_results) != 5:
-        errors.append("behavior baseline must contain five evaluated results")
+    if not isinstance(baseline_results, list):
+        errors.append("behavior baseline results must be an array")
     else:
-        result_ids = [result.get("case_id") for result in baseline_results if isinstance(result, dict)]
-        expected_result_ids = {
-            "ai-video-proposal-rewrite": 1,
-            "diagnosis-does-not-overwrite": 1,
-            "routing-boundaries": 1,
-            "decision-entry-preserves-engineering-source": 2,
-        }
-        if {case_id: result_ids.count(case_id) for case_id in set(result_ids)} != expected_result_ids:
-            errors.append("behavior baseline does not cover the required smoke and repeat cases")
+        result_ids = [
+            result.get("case_id") if isinstance(result, dict) else None
+            for result in baseline_results
+        ]
+        if Counter(result_ids) != Counter(current_cases.keys()):
+            errors.append(
+                "behavior baseline must contain exactly one result for every current case"
+            )
+        rejudge_count = sum(
+            isinstance(result, dict)
+            and isinstance(result.get("lineage"), str)
+            and result["lineage"].startswith("explicit_rejudge_after_")
+            for result in baseline_results
+        )
+        if isinstance(acceptance, dict) and acceptance.get(
+            "explicit_rejudges"
+        ) != f"{rejudge_count}/{rejudge_count} PASS":
+            errors.append(
+                "behavior baseline acceptance must match explicit rejudge lineage"
+            )
         for result in baseline_results:
             if not isinstance(result, dict) or result.get("status") != "PASS":
                 errors.append("every behavior baseline result must be PASS")
                 continue
+            case_id = result.get("case_id")
+            current_case = current_cases.get(case_id) if isinstance(case_id, str) else None
+            current_digest = (
+                current_case_digests.get(case_id) if isinstance(case_id, str) else None
+            )
+            if current_case is None or current_digest is None:
+                errors.append(f"behavior baseline references an invalid case: {case_id!r}")
+            elif result.get("case_digest") != current_digest:
+                errors.append(
+                    f"behavior baseline case_digest does not match current case: {case_id}"
+                )
+            source_artifact = result.get("source_artifact")
+            source_input_sha256 = result.get("source_input_sha256")
+            source_result_sha256 = result.get("source_result_sha256")
+            lineage = result.get("lineage")
+            if (
+                not isinstance(source_artifact, str)
+                or not source_artifact.startswith(".artifacts/write-craft-evals/")
+                or ".." in Path(source_artifact).parts
+            ):
+                errors.append(f"behavior baseline source artifact is invalid: {case_id}")
+            elif raw_artifact_roots and not any(
+                source_artifact.startswith(f"{artifact_root}/")
+                for artifact_root in raw_artifact_roots
+            ):
+                errors.append(
+                    f"behavior baseline source artifact is outside its declared roots: {case_id}"
+                )
+            if not isinstance(source_input_sha256, str) or not SHA256.fullmatch(
+                source_input_sha256
+            ):
+                errors.append(f"behavior baseline input hash is invalid: {case_id}")
+            if not isinstance(source_result_sha256, str) or not SHA256.fullmatch(
+                source_result_sha256
+            ):
+                errors.append(f"behavior baseline result hash is invalid: {case_id}")
+            if lineage == "original":
+                if "original_failure" in result:
+                    errors.append(
+                        f"behavior baseline original result must not claim a failure: {case_id}"
+                    )
+            elif (
+                isinstance(lineage, str)
+                and lineage.startswith("explicit_rejudge_after_")
+                and lineage != "explicit_rejudge_after_"
+            ):
+                original_failure = result.get("original_failure")
+                if (
+                    not isinstance(original_failure, dict)
+                    or original_failure.get("status") != "ERROR"
+                    or not isinstance(original_failure.get("error"), str)
+                    or not original_failure["error"].strip()
+                    or not isinstance(original_failure.get("result_sha256"), str)
+                    or not SHA256.fullmatch(original_failure["result_sha256"])
+                ):
+                    errors.append(
+                        f"behavior baseline rejudge lineage is incomplete: {case_id}"
+                    )
+            else:
+                errors.append(f"behavior baseline lineage is invalid: {case_id}")
             candidate = result.get("candidate")
             judgment = result.get("judgment")
             if not isinstance(candidate, str) or not candidate.strip():
@@ -386,6 +513,36 @@ def validate() -> list[str]:
                 errors.append("behavior baseline judgment must be a PASS judgment.v1")
             elif result.get("judgment_sha256") != sha256_text(canonical_json(judgment)):
                 errors.append("behavior baseline judgment_sha256 mismatch")
+            elif current_case is not None:
+                if judgment.get("case_id") != case_id:
+                    errors.append("behavior baseline judgment case_id mismatch")
+                expected = current_case.get("expected")
+                if not isinstance(expected, dict):
+                    errors.append(f"behavior baseline current case contract is invalid: {case_id}")
+                    continue
+                for field in ("must", "must_not"):
+                    criteria = expected.get(field)
+                    checks = judgment.get(field)
+                    if not isinstance(criteria, list) or not isinstance(checks, list):
+                        errors.append(
+                            f"behavior baseline judgment {field} is incomplete: {case_id}"
+                        )
+                        continue
+                    if len(checks) != len(criteria) or any(
+                        not isinstance(check, dict)
+                        or check.get("criterion") != criterion
+                        or check.get("status") != "PASS"
+                        or not isinstance(check.get("evidence"), str)
+                        or not check["evidence"].strip()
+                        for criterion, check in zip(criteria, checks)
+                    ):
+                        errors.append(
+                            f"behavior baseline judgment {field} does not match current contract: {case_id}"
+                        )
+                if judgment.get("blocking_issues") != []:
+                    errors.append(
+                        f"behavior baseline PASS judgment contains blocking issues: {case_id}"
+                    )
 
     for path in product_text_files():
         text = path.read_text(encoding="utf-8")

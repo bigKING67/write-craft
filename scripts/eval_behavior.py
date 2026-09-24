@@ -248,8 +248,10 @@ def parse_judgment(text: str, case: dict[str, Any]) -> dict[str, Any]:
                 raise ContractError(f"judge {field} evidence must be non-empty")
 
     blocking = payload.get("blocking_issues")
-    if not isinstance(blocking, list) or not all(isinstance(item, str) for item in blocking):
-        raise ContractError("judge blocking_issues must be a string array")
+    if not isinstance(blocking, list) or not all(
+        isinstance(item, str) and item.strip() for item in blocking
+    ):
+        raise ContractError("judge blocking_issues must be an array of non-empty strings")
 
     statuses = [
         check["status"]
@@ -257,7 +259,9 @@ def parse_judgment(text: str, case: dict[str, Any]) -> dict[str, Any]:
         for check in payload[field]
     ]
     computed = (
-        "PASS"
+        "FAIL"
+        if blocking
+        else "PASS"
         if all(status == "PASS" for status in statuses)
         else "FAIL"
         if "FAIL" in statuses
@@ -291,9 +295,11 @@ def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
 判分规则：
 - must 项只有在候选稿明确满足且没有越过原始材料证据边界时才为 PASS。
 - must_not 项只有在对应禁用行为没有出现时才为 PASS；出现则为 FAIL。
+- status 表示候选稿是否符合该条合同，不表示该行为是否出现。例如 must_not 为“编造数据”且候选稿没有编造时，status 必须是 PASS，不能写 FAIL 或自造枚举。
 - 无法确定时使用 UNCERTAIN。不要用常识替候选稿补齐。
 - evidence 必须引用或准确指出候选稿中的依据；缺少依据时说明缺失。
 - 每一个 status 字段的值必须精确等于 PASS、FAIL 或 UNCERTAIN 三者之一，禁止在 status 中添加解释、空格或其他文字；所有解释只能写进 evidence。
+- blocking_issues 只记录足以阻止通过的问题；只要该数组非空，最终 status 必须为 FAIL。
 - 最终只输出一个 JSON 对象，不要使用 Markdown 代码块或附加说明。
 
 JSON 结构：
@@ -535,12 +541,20 @@ def rejudge_case(
     case_dir = case_dir.resolve()
     input_path = case_dir / "input.json"
     candidate_path = case_dir / "candidate.md"
-    if not input_path.is_file() or not candidate_path.is_file():
-        raise ContractError("--rejudge directory must contain input.json and candidate.md")
+    result_path = case_dir / "result.json"
+    if not input_path.is_file() or not candidate_path.is_file() or not result_path.is_file():
+        raise ContractError(
+            "--rejudge directory must contain input.json, candidate.md, and result.json"
+        )
     try:
-        input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+        input_text = input_path.read_text(encoding="utf-8")
+        result_text = result_path.read_text(encoding="utf-8")
+        input_payload = json.loads(input_text)
+        original_result = json.loads(result_text)
     except (OSError, json.JSONDecodeError) as exc:
-        raise ContractError(f"unable to read rejudge input: {exc}") from exc
+        raise ContractError(f"unable to read rejudge source artifacts: {exc}") from exc
+    if not isinstance(input_payload, dict) or not isinstance(original_result, dict):
+        raise ContractError("rejudge source artifacts must contain JSON objects")
     case = input_payload.get("case")
     source = input_payload.get("source")
     if not isinstance(case, dict) or not isinstance(source, str):
@@ -548,9 +562,19 @@ def rejudge_case(
     contract_errors = validate_payload({"schema": SCHEMA, "cases": [case]})
     if contract_errors:
         raise ContractError("invalid rejudge case: " + "; ".join(contract_errors))
+    case_digest = sha256_text(canonical_json({"case": case, "source": source}))
+    if input_payload.get("case_digest") != case_digest:
+        raise ContractError("rejudge input case_digest does not match its case and source")
+    if original_result.get("case_id") != case.get("id"):
+        raise ContractError("rejudge result case_id does not match input.json")
+    if original_result.get("case_digest") != case_digest:
+        raise ContractError("rejudge result case_digest does not match input.json")
     candidate = candidate_path.read_text(encoding="utf-8").strip()
     if not candidate:
         raise ContractError("rejudge candidate.md is empty")
+    candidate_sha256 = sha256_text(candidate)
+    if original_result.get("candidate_sha256") != candidate_sha256:
+        raise ContractError("rejudge candidate.md does not match the original result hash")
 
     index = 1
     while (case_dir / f"rejudge-{index}").exists():
@@ -572,7 +596,10 @@ def rejudge_case(
         "schema": "write-craft.rejudge.v1",
         "case_id": case.get("id"),
         "source_case_dir": str(case_dir),
-        "candidate_sha256": sha256_text(candidate),
+        "source_input_sha256": sha256_text(input_text),
+        "source_result_sha256": sha256_text(result_text),
+        "case_digest": case_digest,
+        "candidate_sha256": candidate_sha256,
         "judge": {
             "model": judge_model,
             "thinking": judge_thinking,
