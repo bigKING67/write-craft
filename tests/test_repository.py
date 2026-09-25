@@ -44,8 +44,187 @@ class RepositoryContractTests(unittest.TestCase):
         cases = payload["cases"]
         case_ids = {case["id"] for case in cases}
         tags = {tag for case in cases for tag in case["tags"]}
+        tracks = {case["track"] for case in cases}
         self.assertTrue({"rewrite", "diagnose", "evidence", "routing", "reader-test"} <= tags)
+        self.assertEqual(tracks, {"regression", "exploration"})
         self.assertIn("decision-entry-preserves-engineering-source", case_ids)
+        self.assertIn("approved-plan-preserves-editing-authority", case_ids)
+        self.assertIn("proposal-mode-separates-new-suggestions", case_ids)
+        self.assertIn("clean-delivery-without-process-commentary", case_ids)
+        self.assertIn("same-source-different-readers", case_ids)
+        self.assertIn(
+            "human-reader-test-records-understanding-not-agreement", case_ids
+        )
+        self.assertIn("multi-source-conflict-preserves-authority", case_ids)
+        source_conflict = next(
+            case
+            for case in cases
+            if case["id"] == "multi-source-conflict-preserves-authority"
+        )
+        self.assertEqual(source_conflict["track"], "exploration")
+        self.assertEqual(
+            {source["source_id"] for source in source_conflict["sources"]},
+            {"approval-record", "later-working-draft"},
+        )
+        reader_case = next(
+            case for case in cases if case["id"] == "sufficient-source-no-repeat-questions"
+        )
+        self.assertEqual(len(reader_case["reader_test"]["questions"]), 6)
+        self.assertIn(
+            "causality",
+            {question["id"] for question in reader_case["reader_test"]["questions"]},
+        )
+        rewrite_case = next(
+            case for case in cases if case["id"] == "ai-video-proposal-rewrite"
+        )
+        targeted_ids = {
+            "ai-video-proposal-rewrite",
+            "sufficient-source-no-repeat-questions",
+            "diagnosis-does-not-overwrite",
+            "routing-boundaries",
+        }
+        for case in cases:
+            if case["id"] in targeted_ids:
+                semantic = case.get("semantic_contract")
+                self.assertIsInstance(semantic, dict)
+                self.assertTrue(semantic["facts"])
+                self.assertTrue(semantic["forbidden_inferences"])
+                self.assertEqual(
+                    set(semantic),
+                    {
+                        "facts",
+                        "allowed_inferences",
+                        "forbidden_inferences",
+                        "unknowns",
+                        "reader_truths",
+                        "reader_misreadings",
+                    },
+                )
+        self.assertEqual(rewrite_case["max_revisions"], 1)
+        self.assertEqual(reader_case["max_revisions"], 1)
+        approved_case = next(
+            case
+            for case in cases
+            if case["id"] == "approved-plan-preserves-editing-authority"
+        )
+        audience_case = next(
+            case for case in cases if case["id"] == "same-source-different-readers"
+        )
+        decision_entry_case = next(
+            case
+            for case in cases
+            if case["id"] == "decision-entry-preserves-engineering-source"
+        )
+        self.assertEqual(approved_case["max_revisions"], 1)
+        self.assertEqual(audience_case["max_revisions"], 1)
+        self.assertEqual(decision_entry_case["max_revisions"], 1)
+        self.assertIn(
+            "基线、负责人",
+            " ".join(approved_case["expected"]["must_not"]),
+        )
+        self.assertIn(
+            "验收用途",
+            " ".join(audience_case["expected"]["must_not"]),
+        )
+        audience_prohibited = " ".join(audience_case["expected"]["must_not"])
+        self.assertIn("费用构成", audience_prohibited)
+        self.assertIn("不可绕过", audience_prohibited)
+        gaps_case = next(
+            case for case in cases if case["id"] == "critical-gaps-with-draft"
+        )
+        constraint_case = next(
+            case
+            for case in cases
+            if case["id"] == "decision-changing-technical-constraint"
+        )
+        self.assertEqual(gaps_case["max_revisions"], 1)
+        self.assertEqual(constraint_case["max_revisions"], 1)
+        self.assertIn(
+            "使用范围、交付方式",
+            " ".join(gaps_case["expected"]["must_not"]),
+        )
+        self.assertIn(
+            "不虚构附录内容",
+            " ".join(constraint_case["expected"]["must"]),
+        )
+        constraint_prohibited = " ".join(constraint_case["expected"]["must_not"])
+        self.assertIn("当前版本不具备该能力", constraint_prohibited)
+        self.assertIn("GPU 型号", constraint_prohibited)
+        self.assertIn("组件、接口、部署方式", constraint_prohibited)
+        self.assertIn("任务模式", constraint_prohibited)
+        self.assertIn("未授权素材不可用", constraint_prohibited)
+        self.assertIn("尚未实现自动化", constraint_prohibited)
+        self.assertIn("推进前明确预期", constraint_prohibited)
+        self.assertIn("辅助剪辑方案", rewrite_case["source"])
+        self.assertIn("不申请立项、拨款或审批", rewrite_case["source"])
+        self.assertTrue(
+            any("擅自把原方案改成试点" in item for item in rewrite_case["expected"]["must_not"])
+        )
+        self.assertFalse(
+            any("首期建议" in item for item in rewrite_case["expected"]["must"])
+        )
+        self.assertTrue(
+            any("后续服务话术" in item for item in rewrite_case["expected"]["must_not"])
+        )
+        reader_must = " ".join(reader_case["expected"]["must"])
+        reader_must_not = " ".join(reader_case["expected"]["must_not"])
+        self.assertIn("三项试点前后比较指标", reader_must)
+        self.assertIn("新增审批事项", reader_must_not)
+        self.assertIn("数据记录流程", reader_must_not)
+        self.assertIn("不具备自动发送能力", reader_must_not)
+        self.assertIn("已证实因果", reader_must_not)
+        self.assertIn("持续成本", " ".join(rewrite_case["expected"]["must_not"]))
+        diagnosis_case = next(
+            case for case in cases if case["id"] == "diagnosis-does-not-overwrite"
+        )
+        self.assertIn("原稿全文只有以下五段", diagnosis_case["source"])
+        self.assertNotIn("max_revisions", diagnosis_case)
+        self.assertTrue(
+            any(
+                "无来源的确定性判断" in item
+                for item in diagnosis_case["expected"]["must_not"]
+            )
+        )
+        diagnosis_prohibited = " ".join(diagnosis_case["expected"]["must_not"])
+        self.assertIn("看完不知道如何回应", diagnosis_prohibited)
+        self.assertIn("推导业务贡献", diagnosis_prohibited)
+        routing_case = next(
+            case for case in cases if case["id"] == "routing-boundaries"
+        )
+        self.assertIn("明确不主导广告创意", routing_case["source"])
+        status_case = next(
+            case
+            for case in cases
+            if case["id"] == "status-update-without-fake-approval"
+        )
+        status_prohibited = " ".join(status_case["expected"]["must_not"])
+        self.assertIn("完成本地测试", status_prohibited)
+        self.assertIn("测试通过", status_prohibited)
+        self.assertIn("进展正常", status_prohibited)
+        self.assertNotIn("风险", " ".join(status_case["expected"]["must"]))
+        skill_text = (ROOT / "skills" / "write-craft" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        normalized_skill_text = " ".join(skill_text.split())
+        self.assertIn(
+            "completing a test is not the same as passing it",
+            normalized_skill_text,
+        )
+        self.assertIn("Silence is not an explicitly named unknown", skill_text)
+        self.assertIn("材料未提供当前基线", skill_text)
+        self.assertIn("proceeding as planned", normalized_skill_text)
+        self.assertIn("团队按计划推进", skill_text)
+        self.assertIn("exactly those three facts", normalized_skill_text)
+        self.assertIn("尚未给出测试结论", skill_text)
+        self.assertIn("components, interfaces, or deployment methods", skill_text)
+        self.assertIn("没有可放入附录的内容", skill_text)
+        self.assertIn("mode classification", skill_text)
+        self.assertIn("separate application is required", normalized_skill_text)
+        self.assertIn("Treat an unstated reader task as an observed gap", skill_text)
+        self.assertIn("A Diagnose response is incomplete", skill_text)
+        self.assertIn("读者看完不知道如何回应", skill_text)
+        self.assertIn("infer each component's business contribution", skill_text)
+        self.assertIn("完整工程方案见文件二", skill_text)
         length_case = next(
             case for case in cases if case["id"] == "strict-total-length-budget"
         )
@@ -62,7 +241,29 @@ class RepositoryContractTests(unittest.TestCase):
         for invariant in ("编造", "生产上线", "独立通过", "飞书写入", "嵌入电子表格"):
             self.assertIn(invariant, prohibited)
 
-    def test_source_validator_rejects_stale_behavior_baseline(self) -> None:
+    def test_source_integrity_rejects_permanent_modal_strengthening(self) -> None:
+        source_integrity = (
+            ROOT / "skills" / "write-craft" / "references" / "source-integrity.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("current, phase-specific, or approved boundary", source_integrity)
+        self.assertIn("不是过渡做法", source_integrity)
+        self.assertIn("以后也不会自动化", source_integrity)
+
+    def test_release_policy_requires_layered_evidence(self) -> None:
+        policy = json.loads(
+            (ROOT / "evals" / "release-policy.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(policy["required_tracks"], ["regression"])
+        self.assertTrue(policy["exploration"]["require_disclosure"])
+        self.assertTrue(policy["judge_calibration"]["required"])
+        self.assertEqual(
+            policy["judge_calibration"]["fixtures"], "evals/judge-fixtures.json"
+        )
+        self.assertGreaterEqual(policy["human_acceptance"]["minimum_documents"], 3)
+        self.assertTrue(policy["human_acceptance"]["require_independence_record"])
+        self.assertTrue(policy["package"]["require_boundary_check"])
+
+    def test_release_validator_rejects_stale_behavior_baseline(self) -> None:
         original_read_json = source_validator.read_json
 
         def read_with_drift(path: Path) -> dict[str, object]:
@@ -75,13 +276,13 @@ class RepositoryContractTests(unittest.TestCase):
             return payload
 
         with patch.object(source_validator, "read_json", side_effect=read_with_drift):
-            errors = source_validator.validate()
+            errors = source_validator.validate_release_evidence()
         self.assertTrue(
             any("case_digest does not match current case" in error for error in errors),
             errors,
         )
 
-    def test_source_validator_rejects_incomplete_behavior_baseline(self) -> None:
+    def test_source_validator_rejects_corrupted_historical_baseline(self) -> None:
         original_read_json = source_validator.read_json
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         baseline_path = ROOT / "evals" / "baselines" / f"pi-v{version}.json"
@@ -98,11 +299,11 @@ class RepositoryContractTests(unittest.TestCase):
         with patch.object(source_validator, "read_json", side_effect=read_without_one_result):
             errors = source_validator.validate()
         self.assertTrue(
-            any("exactly one result for every current case" in error for error in errors),
+            any("acceptance must match its result count" in error for error in errors),
             errors,
         )
 
-    def test_source_validator_rejects_overlength_behavior_candidate(self) -> None:
+    def test_release_validator_rejects_overlength_behavior_candidate(self) -> None:
         original_read_json = source_validator.read_json
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         baseline_path = ROOT / "evals" / "baselines" / f"pi-v{version}.json"
@@ -134,7 +335,7 @@ class RepositoryContractTests(unittest.TestCase):
             "read_json",
             side_effect=read_with_overlength_candidate,
         ):
-            errors = source_validator.validate()
+            errors = source_validator.validate_release_evidence()
         self.assertTrue(
             any("exceeds max_han_characters" in error for error in errors),
             errors,

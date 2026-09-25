@@ -5,12 +5,22 @@ conversation history. It is not a confidence ritual and must not be claimed
 unless a genuinely fresh context received only the final document and test
 questions.
 
-## Prepare the questions
+## Contents
 
-Choose five to eight questions a real reader would ask. Cover the document's
-purpose, recommendation, evidence, scope, resources, risks, uncertainty, and
-requested action. Use questions that have objectively checkable answers in the
-document; do not ask whether the prose “feels good”.
+- Prepare answerable understanding points
+- Run a human reading test
+- Use an independent model context when appropriate
+- Interpret results without confusing disagreement with misunderstanding
+- Revise within a fixed budget
+
+## Prepare answerable understanding points
+
+Before testing, derive the important understanding points from the source and
+the communication purpose. Choose neutral questions a real reader would ask.
+Cover only the dimensions relevant to this document, such as purpose, process,
+evidence, scope, resources, risks, uncertainty, and requested action. Use
+questions with checkable answers; do not ask whether the prose “feels good” or
+embed the desired answer in the question.
 
 Examples:
 
@@ -22,17 +32,80 @@ Examples:
 - What could make the proposal fail or cause the team to stop?
 - What decision or action is requested from the reader?
 
-## Run when an independent context is available
+## Run a human reading test
+
+For exploratory validation, use three to five real, de-identified documents
+when available; include at least one source whose technical detail currently
+buries the main point. This is a practical starting range, not evidence of broad
+generality.
+
+Use a reader who did not write the source, join the project discussion, or see
+the comparison version. Give them only the candidate document. Ask them to:
+
+1. freely restate what the document says;
+2. answer the neutral understanding questions; and
+3. identify what remains unclear or requires more context.
+
+Do not explain the project until this first round is complete. Record:
+
+- whether the reader understood the purpose, workflow, boundaries, and status;
+- what the author had to explain afterward;
+- where the reader reread or struggled to find the point, plus actual reading
+  time when practical; and
+- how much structural, factual, and sentence editing remains before sending.
+
+Do not substitute a synthetic example for a missing real document or describe
+the author's self-review as an independent reader result.
+
+Use a compact record such as:
+
+```text
+Document and source revision:
+Communication purpose and intended reader:
+Reader independence (what they had seen before):
+Candidate revision:
+Reading time and reread locations:
+Free restatement:
+Question / answer / source-grounded result:
+Extra explanation the author had to provide:
+Remaining structural / factual / sentence edits:
+Test status: completed / partial / not run
+Limitations of this comparison:
+```
+
+## Use an independent model context when appropriate
 
 Give the reader only the final document and questions. Ask it to answer each
 question, cite the section that supports the answer, list ambiguities, identify
 assumed background knowledge, and flag contradictions. Do not include the
 author's intent, prior discussion, expected answers, or suspected defects.
 
-Fix the document, not the test, when the reader cannot answer a material
-question. Stop when the questions are answered accurately and a new pass finds
-no material ambiguity or contradiction. Do not polish indefinitely for minor
-stylistic preferences.
+Model review expands coverage; it does not replace human calibration for claims
+about real readers. A successful model response means the stage executed, not
+that its answer was correct.
+
+## Interpret and revise
+
+Complete source-integrity review before blind reading. Do not spend a reader
+test on a draft already known to contain unsupported claims.
+
+Compare the reader's answer with the source-grounded understanding points:
+
+- If the source contains a material fact, the draft omits it, and the reader
+  says “文档未说明”, the reader is correct and coverage failed.
+- If the source is genuinely unknown and the draft says so, lack of a definite
+  answer is not a writing failure.
+- If the draft adds a false fact and the reader repeats it accurately,
+  comprehension succeeded but source integrity failed.
+- A reader can understand a proposal and still disagree with it or ask a normal
+  business question. Disagreement is not evidence of unclear writing.
+
+Fix the document, not the test, when a material question cannot be answered.
+The one additional revision after the first draft is shared with any earlier
+source-integrity correction; reader testing does not start a new revision
+budget. Rerun the affected checks and report first-draft and revised results
+separately. Do not keep trying until one favorable output appears or polish
+indefinitely for minor preferences.
 
 ## Fallback prompt
 

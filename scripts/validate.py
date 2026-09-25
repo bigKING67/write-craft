@@ -11,6 +11,25 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+try:
+    from scripts.eval_contracts import (
+        canonical_json,
+        case_sources,
+        han_character_count,
+        resolved_case_digest,
+        semantic_contract_errors,
+        sha256_text,
+    )
+except ModuleNotFoundError:
+    from eval_contracts import (  # type: ignore[no-redef]
+        canonical_json,
+        case_sources,
+        han_character_count,
+        resolved_case_digest,
+        semantic_contract_errors,
+        sha256_text,
+    )
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "write-craft"
@@ -38,9 +57,14 @@ REQUIRED_FILES = {
     ROOT / "THIRD_PARTY_NOTICES.md",
     ROOT / "VERSION",
     ROOT / "package.json",
+    ROOT / "scripts" / "eval_contracts.py",
+    ROOT / "scripts" / "eval_structured_output.ts",
+    ROOT / "scripts" / "release_check.py",
     ROOT / "upstreams.lock.json",
     ROOT / "docs" / "upstream-absorption.md",
     ROOT / "evals" / "cases.json",
+    ROOT / "evals" / "judge-fixtures.json",
+    ROOT / "evals" / "release-policy.json",
     SKILL / "SKILL.md",
     SKILL / "VERSION",
     SKILL / "agents" / "openai.yaml",
@@ -62,18 +86,6 @@ def read_json(path: Path) -> dict[str, object]:
     return payload
 
 
-def canonical_json(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def sha256_text(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def han_character_count(value: str) -> int:
-    return len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", value))
-
-
 def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
@@ -87,20 +99,448 @@ def tree_digest(root: Path) -> str:
 
 
 def behavior_case_digest(case: dict[str, object]) -> str:
-    source = case.get("source")
-    source_file = case.get("source_file")
-    has_source = isinstance(source, str) and bool(source.strip())
-    has_source_file = isinstance(source_file, str) and bool(source_file.strip())
-    if has_source == has_source_file:
-        raise ValueError("behavior case must define exactly one source")
-    if has_source_file:
-        fixture = (ROOT / source_file).resolve()
+    sources = case_sources(case, ROOT)
+    return resolved_case_digest(case, sources)
+
+
+def validate_baseline_integrity(
+    path: Path, baseline: dict[str, object]
+) -> list[str]:
+    """Validate immutable evidence without binding it to the current candidate."""
+
+    errors: list[str] = []
+    label = path.relative_to(ROOT).as_posix()
+    match = re.fullmatch(r"pi-v([0-9]+\.[0-9]+\.[0-9]+)\.json", path.name)
+    filename_version = match.group(1) if match else None
+    if filename_version is None:
+        errors.append(f"behavior baseline has an invalid filename: {label}")
+    if baseline.get("schema") != "write-craft.behavior-baseline.v1":
+        errors.append(f"unexpected behavior baseline schema: {label}")
+    if baseline.get("version") != filename_version:
+        errors.append(f"behavior baseline version must match its filename: {label}")
+
+    provenance = baseline.get("provenance")
+    raw_artifact_roots: list[str] = []
+    if not isinstance(provenance, dict):
+        errors.append(f"behavior baseline provenance must be an object: {label}")
+    else:
+        if not isinstance(provenance.get("source_revision"), str) or not COMMIT.fullmatch(
+            provenance["source_revision"]
+        ):
+            errors.append(f"behavior baseline source revision is invalid: {label}")
+        if not isinstance(provenance.get("skill_sha256"), str) or not SHA256.fullmatch(
+            provenance["skill_sha256"]
+        ):
+            errors.append(f"behavior baseline Skill hash is invalid: {label}")
+        if provenance.get("independent_contexts") is not True:
+            errors.append(f"behavior baseline must record independent contexts: {label}")
+        if type(provenance.get("cross_model_verification")) is not bool:
+            errors.append(f"behavior baseline cross-model evidence must be explicit: {label}")
+        if provenance.get("run_mode") not in {
+            "single_full_run",
+            "segmented_full_with_explicit_rejudge",
+        }:
+            errors.append(f"behavior baseline run mode is invalid: {label}")
+        roots = provenance.get("raw_artifact_roots")
+        if (
+            not isinstance(roots, list)
+            or not roots
+            or len(roots) != len(set(roots))
+            or not all(
+                isinstance(item, str)
+                and item.startswith(".artifacts/write-craft-evals/")
+                and ".." not in Path(item).parts
+                for item in roots
+            )
+        ):
+            errors.append(f"behavior baseline raw artifact roots are invalid: {label}")
+        else:
+            raw_artifact_roots = roots
+
+    results = baseline.get("results")
+    if not isinstance(results, list) or not results:
+        errors.append(f"behavior baseline results must be a non-empty array: {label}")
+        return errors
+
+    result_ids = [
+        result.get("case_id") if isinstance(result, dict) else None
+        for result in results
+    ]
+    if any(not isinstance(case_id, str) or not case_id for case_id in result_ids):
+        errors.append(f"behavior baseline case ids must be non-empty: {label}")
+    if len(result_ids) != len(set(result_ids)):
+        errors.append(f"behavior baseline case ids must be unique: {label}")
+
+    acceptance = baseline.get("acceptance")
+    expected_full_result = f"{len(results)}/{len(results)} PASS"
+    if (
+        not isinstance(acceptance, dict)
+        or acceptance.get("full_cases") != expected_full_result
+    ):
+        errors.append(
+            f"behavior baseline acceptance must match its result count: {label}"
+        )
+    rejudge_count = sum(
+        isinstance(result, dict)
+        and isinstance(result.get("lineage"), str)
+        and result["lineage"].startswith("explicit_rejudge_after_")
+        for result in results
+    )
+    if isinstance(acceptance, dict) and acceptance.get(
+        "explicit_rejudges"
+    ) != f"{rejudge_count}/{rejudge_count} PASS":
+        errors.append(
+            f"behavior baseline acceptance must match explicit rejudge lineage: {label}"
+        )
+
+    for result in results:
+        if not isinstance(result, dict) or result.get("status") != "PASS":
+            errors.append(f"every behavior baseline result must be PASS: {label}")
+            continue
+        case_id = result.get("case_id")
+        if not isinstance(result.get("case_digest"), str) or not SHA256.fullmatch(
+            result["case_digest"]
+        ):
+            errors.append(f"behavior baseline case digest is invalid: {case_id}")
+        source_artifact = result.get("source_artifact")
+        if (
+            not isinstance(source_artifact, str)
+            or not source_artifact.startswith(".artifacts/write-craft-evals/")
+            or ".." in Path(source_artifact).parts
+        ):
+            errors.append(f"behavior baseline source artifact is invalid: {case_id}")
+        elif raw_artifact_roots and not any(
+            source_artifact.startswith(f"{artifact_root}/")
+            for artifact_root in raw_artifact_roots
+        ):
+            errors.append(
+                f"behavior baseline source artifact is outside its declared roots: {case_id}"
+            )
+        for field in ("source_input_sha256", "source_result_sha256"):
+            value = result.get(field)
+            if not isinstance(value, str) or not SHA256.fullmatch(value):
+                errors.append(f"behavior baseline {field} is invalid: {case_id}")
+
+        lineage = result.get("lineage")
+        if lineage == "original":
+            if "original_failure" in result:
+                errors.append(
+                    f"behavior baseline original result must not claim a failure: {case_id}"
+                )
+        elif (
+            isinstance(lineage, str)
+            and lineage.startswith("explicit_rejudge_after_")
+            and lineage != "explicit_rejudge_after_"
+        ):
+            original_failure = result.get("original_failure")
+            if (
+                not isinstance(original_failure, dict)
+                or original_failure.get("status") != "ERROR"
+                or not isinstance(original_failure.get("error"), str)
+                or not original_failure["error"].strip()
+                or not isinstance(original_failure.get("result_sha256"), str)
+                or not SHA256.fullmatch(original_failure["result_sha256"])
+            ):
+                errors.append(
+                    f"behavior baseline rejudge lineage is incomplete: {case_id}"
+                )
+        else:
+            errors.append(f"behavior baseline lineage is invalid: {case_id}")
+
+        candidate = result.get("candidate")
+        if not isinstance(candidate, str) or not candidate.strip():
+            errors.append(f"behavior baseline candidate must be non-empty: {case_id}")
+        elif result.get("candidate_sha256") != sha256_text(candidate):
+            errors.append(f"behavior baseline candidate hash mismatch: {case_id}")
+        metrics = result.get("candidate_metrics")
+        if isinstance(candidate, str) and metrics is not None and (
+            not isinstance(metrics, dict)
+            or metrics.get("han_characters") != han_character_count(candidate)
+        ):
+            errors.append(f"behavior baseline candidate metrics are invalid: {case_id}")
+
+        judgment = result.get("judgment")
+        if (
+            not isinstance(judgment, dict)
+            or judgment.get("schema") != "write-craft.judgment.v1"
+            or judgment.get("status") != "PASS"
+        ):
+            errors.append(f"behavior baseline judgment must be PASS: {case_id}")
+            continue
+        if result.get("judgment_sha256") != sha256_text(canonical_json(judgment)):
+            errors.append(f"behavior baseline judgment hash mismatch: {case_id}")
+        if judgment.get("case_id") != case_id:
+            errors.append(f"behavior baseline judgment case id mismatch: {case_id}")
+        for field in ("must", "must_not"):
+            checks = judgment.get(field)
+            if (
+                not isinstance(checks, list)
+                or not checks
+                or any(
+                    not isinstance(check, dict)
+                    or not isinstance(check.get("criterion"), str)
+                    or not check["criterion"].strip()
+                    or check.get("status") != "PASS"
+                    or not isinstance(check.get("evidence"), str)
+                    or not check["evidence"].strip()
+                    for check in checks
+                )
+            ):
+                errors.append(
+                    f"behavior baseline judgment {field} is incomplete: {case_id}"
+                )
+        if judgment.get("blocking_issues") != []:
+            errors.append(
+                f"behavior baseline PASS judgment contains blocking issues: {case_id}"
+            )
+    return errors
+
+
+def validate_release_evidence() -> list[str]:
+    """Require evidence bound to the current Skill and behavior contract."""
+
+    errors = validate()
+    if errors:
+        return errors
+
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    baseline_path = EVAL_BASELINES / f"pi-v{version}.json"
+    if not baseline_path.is_file():
+        return [
+            f"missing current release baseline: {baseline_path.relative_to(ROOT)}"
+        ]
+    try:
+        baseline = read_json(baseline_path)
+        evals = read_json(ROOT / "evals" / "cases.json")
+        release_policy = read_json(ROOT / "evals" / "release-policy.json")
+        judge_fixtures = read_json(ROOT / "evals" / "judge-fixtures.json")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [str(exc)]
+
+    cases = evals.get("cases")
+    if not isinstance(cases, list) or not all(isinstance(case, dict) for case in cases):
+        return ["current behavior cases are invalid"]
+    current_cases = {case["id"]: case for case in cases}
+    current_digests: dict[str, str] = {}
+    for case_id, case in current_cases.items():
         try:
-            fixture.relative_to(EVAL_FIXTURES.resolve())
-        except ValueError as exc:
-            raise ValueError("behavior case source_file escapes evals/fixtures") from exc
-        source = fixture.read_text(encoding="utf-8")
-    return sha256_text(canonical_json({"case": case, "source": source}))
+            current_digests[case_id] = behavior_case_digest(case)
+        except (OSError, ValueError) as exc:
+            errors.append(f"release case digest failed for {case_id}: {exc}")
+
+    provenance = baseline.get("provenance")
+    if not isinstance(provenance, dict) or provenance.get("skill_sha256") != tree_digest(
+        SKILL
+    ):
+        errors.append("release baseline skill_sha256 does not match the current Skill")
+
+    required_tracks = set(release_policy.get("required_tracks", []))
+    regression_cases = {
+        case_id: case
+        for case_id, case in current_cases.items()
+        if case.get("track") in required_tracks
+    }
+    exploration_cases = {
+        case_id: case
+        for case_id, case in current_cases.items()
+        if case.get("track") == "exploration"
+    }
+    acceptance = baseline.get("acceptance")
+    expected_regression_result = (
+        f"{len(regression_cases)}/{len(regression_cases)} PASS"
+    )
+    if (
+        not isinstance(acceptance, dict)
+        or acceptance.get("regression_cases") != expected_regression_result
+    ):
+        errors.append("release baseline must record every regression case as PASS")
+    if exploration_cases and (
+        not isinstance(acceptance, dict)
+        or not isinstance(acceptance.get("exploration_disclosure"), str)
+        or not acceptance["exploration_disclosure"].strip()
+    ):
+        errors.append("release baseline must disclose exploration results or NOT_RUN")
+
+    fixture_count = len(judge_fixtures.get("fixtures", []))
+    expected_calibration = f"{fixture_count}/{fixture_count} PASS"
+    fixtures_sha256 = sha256_text(canonical_json(judge_fixtures))
+    if (
+        not isinstance(acceptance, dict)
+        or acceptance.get("judge_calibration") != expected_calibration
+        or acceptance.get("judge_fixtures_sha256") != fixtures_sha256
+    ):
+        errors.append("release baseline must bind a passing current judge calibration")
+
+    human_policy = release_policy.get("human_acceptance")
+    human_acceptance = acceptance.get("human_acceptance") if isinstance(acceptance, dict) else None
+    minimum_documents = (
+        human_policy.get("minimum_documents")
+        if isinstance(human_policy, dict)
+        else None
+    )
+    if (
+        not isinstance(human_acceptance, dict)
+        or human_acceptance.get("status") != "PASS"
+        or type(human_acceptance.get("documents")) is not int
+        or type(minimum_documents) is not int
+        or human_acceptance["documents"] < minimum_documents
+        or not isinstance(human_acceptance.get("independence_recorded"), bool)
+        or human_acceptance.get("independence_recorded") is not True
+        or not isinstance(human_acceptance.get("limitations"), list)
+        or not human_acceptance["limitations"]
+        or not all(
+            isinstance(item, str) and item.strip()
+            for item in human_acceptance["limitations"]
+        )
+        or not isinstance(human_acceptance.get("record_sha256"), str)
+        or not SHA256.fullmatch(human_acceptance["record_sha256"])
+    ):
+        errors.append("release baseline must bind the required human acceptance summary")
+
+    results = baseline.get("results")
+    if not isinstance(results, list):
+        errors.append("release baseline results must be an array")
+        return errors
+    result_ids = [
+        result.get("case_id") if isinstance(result, dict) else None
+        for result in results
+    ]
+    result_counter = Counter(result_ids)
+    missing_regressions = [
+        case_id for case_id in regression_cases if result_counter[case_id] != 1
+    ]
+    invalid_result_ids = [
+        case_id for case_id in result_ids if case_id not in current_cases
+    ]
+    if missing_regressions or invalid_result_ids or any(
+        count != 1 for count in result_counter.values()
+    ):
+        errors.append(
+            "release baseline must contain exactly one result for every regression case"
+        )
+
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        case_id = result.get("case_id")
+        current_case = current_cases.get(case_id) if isinstance(case_id, str) else None
+        if current_case is None:
+            errors.append(f"release baseline references an invalid case: {case_id!r}")
+            continue
+        digest_matches = result.get("case_digest") == current_digests.get(case_id)
+        if not digest_matches:
+            errors.append(
+                f"release baseline case_digest does not match current case: {case_id}"
+            )
+
+        candidate = result.get("candidate")
+        if isinstance(candidate, str) and isinstance(current_case.get("limits"), dict):
+            maximum = current_case["limits"].get("max_han_characters")
+            actual = han_character_count(candidate)
+            metrics = result.get("candidate_metrics")
+            if type(maximum) is int and actual > maximum:
+                errors.append(
+                    f"release baseline candidate exceeds max_han_characters: {case_id}"
+                )
+            if not isinstance(metrics, dict) or metrics.get("han_characters") != actual:
+                errors.append(
+                    f"release baseline candidate metrics are invalid: {case_id}"
+                )
+
+        judgment = result.get("judgment")
+        expected = current_case.get("expected")
+        if not isinstance(judgment, dict) or not isinstance(expected, dict):
+            errors.append(f"release baseline judgment is invalid: {case_id}")
+            continue
+        for field in ("must", "must_not"):
+            criteria = expected.get(field)
+            checks = judgment.get(field)
+            if not isinstance(criteria, list) or not isinstance(checks, list):
+                errors.append(
+                    f"release baseline judgment {field} is incomplete: {case_id}"
+                )
+                continue
+            if len(checks) != len(criteria) or any(
+                not isinstance(check, dict)
+                or check.get("criterion") != criterion
+                or check.get("status") != "PASS"
+                or not isinstance(check.get("evidence"), str)
+                or not check["evidence"].strip()
+                for criterion, check in zip(criteria, checks)
+            ):
+                errors.append(
+                    f"release baseline judgment {field} does not match current contract: {case_id}"
+                )
+
+        if not digest_matches:
+            continue
+        stages = result.get("stages")
+        if not isinstance(stages, dict):
+            errors.append(f"release baseline stages are missing: {case_id}")
+            continue
+        if stages.get("generation") != "PASS" or stages.get("fact_review") != "PASS":
+            errors.append(f"release baseline required stages did not PASS: {case_id}")
+        reader_test = current_case.get("reader_test")
+        if isinstance(reader_test, dict):
+            if stages.get("reader") != "PASS" or stages.get("reader_review") != "PASS":
+                errors.append(f"release baseline reader stages did not PASS: {case_id}")
+            reader_response = result.get("reader_response")
+            reader_judgment = result.get("reader_judgment")
+            question_ids = [
+                question.get("id")
+                for question in reader_test.get("questions", [])
+                if isinstance(question, dict)
+            ]
+            if (
+                not isinstance(reader_response, dict)
+                or result.get("reader_response_sha256")
+                != sha256_text(canonical_json(reader_response))
+                or reader_response.get("schema") != "write-craft.reader-response.v1"
+                or reader_response.get("case_id") != case_id
+            ):
+                errors.append(f"release baseline reader response is invalid: {case_id}")
+            else:
+                response_ids = [
+                    answer.get("question_id")
+                    for answer in reader_response.get("answers", [])
+                    if isinstance(answer, dict)
+                ]
+                if response_ids != question_ids:
+                    errors.append(
+                        f"release baseline reader response coverage is invalid: {case_id}"
+                    )
+            if (
+                not isinstance(reader_judgment, dict)
+                or result.get("reader_judgment_sha256")
+                != sha256_text(canonical_json(reader_judgment))
+                or reader_judgment.get("schema") != "write-craft.reader-judgment.v1"
+                or reader_judgment.get("case_id") != case_id
+                or reader_judgment.get("status") != "PASS"
+                or reader_judgment.get("blocking_issues") != []
+            ):
+                errors.append(f"release baseline reader judgment is invalid: {case_id}")
+            else:
+                judgment_answers = reader_judgment.get("answers")
+                judgment_ids = (
+                    [
+                        answer.get("question_id")
+                        for answer in judgment_answers
+                        if isinstance(answer, dict)
+                    ]
+                    if isinstance(judgment_answers, list)
+                    else []
+                )
+                if judgment_ids != question_ids or any(
+                    not isinstance(answer, dict) or answer.get("status") != "PASS"
+                    for answer in judgment_answers or []
+                ):
+                    errors.append(
+                        f"release baseline reader judgment coverage is invalid: {case_id}"
+                    )
+        elif stages.get("reader") != "NOT_RUN" or stages.get("reader_review") != "NOT_RUN":
+            errors.append(f"release baseline undeclared reader stages must be NOT_RUN: {case_id}")
+
+    return errors
 
 
 def run(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
@@ -283,10 +723,8 @@ def validate() -> list[str]:
         errors.append(str(exc))
         evals = {}
     cases = evals.get("cases")
-    if evals.get("schema") != "write-craft.behavior-cases.v2":
+    if evals.get("schema") != "write-craft.behavior-cases.v3":
         errors.append("unexpected behavior-cases schema")
-    current_cases: dict[str, dict[str, object]] = {}
-    current_case_digests: dict[str, str] = {}
     if not isinstance(cases, list) or len(cases) < 10:
         errors.append("behavior suite must contain at least ten cases")
     else:
@@ -302,7 +740,6 @@ def validate() -> list[str]:
                 errors.append("behavior case ids must be non-empty and unique")
             else:
                 ids.add(case_id)
-                current_cases[case_id] = case
             tags = case.get("tags")
             if (
                 isinstance(tags, list)
@@ -326,14 +763,19 @@ def validate() -> list[str]:
                 errors.append(f"behavior case {case_id!r} has invalid suite")
             elif suite == "smoke":
                 smoke_cases += 1
+            track = case.get("track")
+            if track not in {"regression", "exploration"}:
+                errors.append(f"behavior case {case_id!r} has invalid track")
 
             source = case.get("source")
             source_file = case.get("source_file")
+            sources = case.get("sources")
             has_source = isinstance(source, str) and bool(source.strip())
             has_source_file = isinstance(source_file, str) and bool(source_file.strip())
-            if has_source == has_source_file:
+            has_sources = isinstance(sources, list) and bool(sources)
+            if sum((has_source, has_source_file, has_sources)) != 1:
                 errors.append(
-                    f"behavior case {case_id!r} must define exactly one of source or source_file"
+                    f"behavior case {case_id!r} must define exactly one source shape"
                 )
             elif has_source_file:
                 fixture = (ROOT / source_file).resolve()
@@ -348,6 +790,48 @@ def validate() -> list[str]:
                         errors.append(
                             f"behavior case {case_id!r} source_file does not exist"
                         )
+            elif has_sources:
+                source_ids: list[str] = []
+                for item in sources:
+                    if not isinstance(item, dict):
+                        errors.append(
+                            f"behavior case {case_id!r} source entries must be objects"
+                        )
+                        continue
+                    source_id = item.get("source_id")
+                    if not isinstance(source_id, str) or not source_id.strip():
+                        errors.append(
+                            f"behavior case {case_id!r} sources need source_id"
+                        )
+                    else:
+                        source_ids.append(source_id)
+                    text = item.get("text")
+                    item_file = item.get("source_file")
+                    has_text = isinstance(text, str) and bool(text.strip())
+                    has_item_file = isinstance(item_file, str) and bool(
+                        item_file.strip()
+                    )
+                    if has_text == has_item_file:
+                        errors.append(
+                            f"behavior case {case_id!r} sources need exactly one text shape"
+                        )
+                    elif has_item_file:
+                        fixture = (ROOT / item_file).resolve()
+                        try:
+                            fixture.relative_to(EVAL_FIXTURES.resolve())
+                        except ValueError:
+                            errors.append(
+                                f"behavior case {case_id!r} source_file escapes evals/fixtures"
+                            )
+                        else:
+                            if not fixture.is_file():
+                                errors.append(
+                                    f"behavior case {case_id!r} source_file does not exist"
+                                )
+                if len(source_ids) != len(set(source_ids)):
+                    errors.append(
+                        f"behavior case {case_id!r} source ids must be unique"
+                    )
             expected = case.get("expected")
             if (
                 not isinstance(case.get("request"), str)
@@ -364,214 +848,192 @@ def validate() -> list[str]:
                 for values in (expected["must"], expected["must_not"])
             ):
                 errors.append(f"behavior case {case_id!r} has invalid expectations")
-            if isinstance(case_id, str) and case_id in current_cases:
-                try:
-                    current_case_digests[case_id] = behavior_case_digest(case)
-                except (OSError, ValueError) as exc:
-                    errors.append(f"behavior case {case_id!r} digest failed: {exc}")
+            errors.extend(
+                semantic_contract_errors(
+                    case.get("semantic_contract"),
+                    f"behavior case {case_id!r} semantic_contract",
+                )
+            )
+            reader_test = case.get("reader_test")
+            if reader_test is not None:
+                if not isinstance(reader_test, dict):
+                    errors.append(
+                        f"behavior case {case_id!r} reader_test must be an object"
+                    )
+                else:
+                    persona = reader_test.get("persona")
+                    questions = reader_test.get("questions")
+                    if not isinstance(persona, str) or not persona.strip():
+                        errors.append(
+                            f"behavior case {case_id!r} reader persona is invalid"
+                        )
+                    if not isinstance(questions, list) or not questions:
+                        errors.append(
+                            f"behavior case {case_id!r} reader questions are invalid"
+                        )
+                    else:
+                        question_ids: list[str] = []
+                        for question in questions:
+                            if not isinstance(question, dict):
+                                errors.append(
+                                    f"behavior case {case_id!r} reader questions must be objects"
+                                )
+                                continue
+                            question_id = question.get("id")
+                            prompt = question.get("question")
+                            answer_key = question.get("answer_key")
+                            if not isinstance(question_id, str) or not question_id.strip():
+                                errors.append(
+                                    f"behavior case {case_id!r} reader question id is invalid"
+                                )
+                            else:
+                                question_ids.append(question_id)
+                            if not isinstance(prompt, str) or not prompt.strip():
+                                errors.append(
+                                    f"behavior case {case_id!r} reader question is invalid"
+                                )
+                            if (
+                                not isinstance(answer_key, list)
+                                or not answer_key
+                                or not all(
+                                    isinstance(value, str) and value.strip()
+                                    for value in answer_key
+                                )
+                            ):
+                                errors.append(
+                                    f"behavior case {case_id!r} reader answer key is invalid"
+                                )
+                        if len(question_ids) != len(set(question_ids)):
+                            errors.append(
+                                f"behavior case {case_id!r} reader question ids must be unique"
+                            )
         for tag in {"rewrite", "diagnose", "evidence", "routing", "reader-test"}:
             if tag not in required_tags:
                 errors.append(f"behavior suite is missing required coverage tag: {tag}")
         if smoke_cases != 4:
             errors.append("behavior suite must contain exactly four smoke cases")
 
-    baseline_path = EVAL_BASELINES / f"pi-v{version}.json"
-    if not baseline_path.is_file():
-        errors.append(f"missing current behavior baseline: {baseline_path.relative_to(ROOT)}")
-        baseline = {}
+    try:
+        judge_fixtures = read_json(ROOT / "evals" / "judge-fixtures.json")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        judge_fixtures = {}
+    fixtures = judge_fixtures.get("fixtures")
+    if judge_fixtures.get("schema") != "write-craft.judge-fixtures.v1":
+        errors.append("unexpected judge-fixtures schema")
+    if not isinstance(fixtures, list) or len(fixtures) < 4:
+        errors.append("judge calibration must contain at least four fixtures")
     else:
+        fixture_ids = [
+            fixture.get("id") if isinstance(fixture, dict) else None
+            for fixture in fixtures
+        ]
+        expected_statuses = {
+            fixture.get("expected_status")
+            for fixture in fixtures
+            if isinstance(fixture, dict)
+        }
+        if (
+            any(not isinstance(fixture_id, str) or not fixture_id for fixture_id in fixture_ids)
+            or len(fixture_ids) != len(set(fixture_ids))
+        ):
+            errors.append("judge fixture ids must be non-empty and unique")
+        if expected_statuses != {"PASS", "FAIL"}:
+            errors.append("judge fixtures must calibrate both PASS and FAIL behavior")
+        for fixture in fixtures:
+            if not isinstance(fixture, dict):
+                errors.append("judge fixtures must be objects")
+                continue
+            case = fixture.get("case")
+            expected = case.get("expected") if isinstance(case, dict) else None
+            if (
+                not isinstance(case, dict)
+                or not isinstance(case.get("id"), str)
+                or not isinstance(case.get("request"), str)
+                or not case["request"].strip()
+                or not isinstance(expected, dict)
+                or any(
+                    not isinstance(expected.get(field), list) or not expected[field]
+                    for field in ("must", "must_not")
+                )
+                or not isinstance(fixture.get("source"), str)
+                or not fixture["source"].strip()
+                or not isinstance(fixture.get("candidate"), str)
+                or not fixture["candidate"].strip()
+            ):
+                errors.append(
+                    f"judge fixture {fixture.get('id')!r} has an incomplete contract"
+                )
+            elif isinstance(case, dict):
+                errors.extend(
+                    semantic_contract_errors(
+                        case.get("semantic_contract"),
+                        f"judge fixture {fixture.get('id')!r} semantic_contract",
+                    )
+                )
+
+    try:
+        release_policy = read_json(ROOT / "evals" / "release-policy.json")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        release_policy = {}
+    if release_policy.get("schema") != "write-craft.release-policy.v1":
+        errors.append("unexpected release-policy schema")
+    if release_policy.get("required_tracks") != ["regression"]:
+        errors.append("release policy must require the regression track")
+    exploration_policy = release_policy.get("exploration")
+    if not isinstance(exploration_policy, dict) or exploration_policy.get(
+        "require_disclosure"
+    ) is not True:
+        errors.append("release policy must require exploration disclosure")
+    behavior_policy = release_policy.get("behavior")
+    if not isinstance(behavior_policy, dict) or any(
+        behavior_policy.get(field) is not True
+        for field in (
+            "require_current_skill_digest",
+            "require_current_case_digests",
+            "require_deterministic_limits",
+        )
+    ):
+        errors.append("release policy behavior gates are incomplete")
+    reader_policy = release_policy.get("reader_testing")
+    if not isinstance(reader_policy, dict) or reader_policy.get(
+        "require_declared_reader_stages"
+    ) is not True:
+        errors.append("release policy must require declared reader stages")
+    calibration_policy = release_policy.get("judge_calibration")
+    if (
+        not isinstance(calibration_policy, dict)
+        or calibration_policy.get("required") is not True
+        or calibration_policy.get("fixtures") != "evals/judge-fixtures.json"
+    ):
+        errors.append("release policy judge calibration gate is incomplete")
+    human_policy = release_policy.get("human_acceptance")
+    if (
+        not isinstance(human_policy, dict)
+        or human_policy.get("required") is not True
+        or type(human_policy.get("minimum_documents")) is not int
+        or human_policy["minimum_documents"] < 1
+        or human_policy.get("require_independence_record") is not True
+        or human_policy.get("require_limitations") is not True
+    ):
+        errors.append("release policy human acceptance gate is incomplete")
+    package_policy = release_policy.get("package")
+    if not isinstance(package_policy, dict) or package_policy.get(
+        "require_boundary_check"
+    ) is not True:
+        errors.append("release policy package boundary gate is incomplete")
+
+    baseline_paths = sorted(EVAL_BASELINES.glob("pi-v*.json"))
+    if not baseline_paths:
+        errors.append("at least one immutable behavior baseline is required")
+    for baseline_path in baseline_paths:
         try:
             baseline = read_json(baseline_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             errors.append(str(exc))
-            baseline = {}
-    if baseline.get("schema") != "write-craft.behavior-baseline.v1":
-        errors.append("unexpected behavior baseline schema")
-    if baseline.get("version") != version:
-        errors.append("behavior baseline version must match VERSION")
-    raw_artifact_roots: list[str] = []
-    provenance = baseline.get("provenance")
-    if not isinstance(provenance, dict):
-        errors.append("behavior baseline provenance must be an object")
-    else:
-        if provenance.get("skill_sha256") != tree_digest(SKILL):
-            errors.append("behavior baseline skill_sha256 does not match the current Skill")
-        if provenance.get("independent_contexts") is not True:
-            errors.append("behavior baseline must record independent contexts")
-        if provenance.get("cross_model_verification") is not False:
-            errors.append("behavior baseline must not overclaim cross-model verification")
-        if provenance.get("run_mode") not in {
-            "single_full_run",
-            "segmented_full_with_explicit_rejudge",
-        }:
-            errors.append("behavior baseline must declare an accepted full-suite run mode")
-        raw_artifact_roots = provenance.get("raw_artifact_roots")
-        if (
-            not isinstance(raw_artifact_roots, list)
-            or not raw_artifact_roots
-            or len(raw_artifact_roots) != len(set(raw_artifact_roots))
-            or not all(
-                isinstance(path, str)
-                and path.startswith(".artifacts/write-craft-evals/")
-                and ".." not in Path(path).parts
-                for path in raw_artifact_roots
-            )
-        ):
-            errors.append("behavior baseline raw artifact roots must be unique eval paths")
-            raw_artifact_roots = []
-    acceptance = baseline.get("acceptance")
-    expected_full_result = f"{len(current_cases)}/{len(current_cases)} PASS"
-    if (
-        not isinstance(acceptance, dict)
-        or acceptance.get("full_cases") != expected_full_result
-    ):
-        errors.append(
-            "behavior baseline acceptance must record every current case as PASS"
-        )
-    baseline_results = baseline.get("results")
-    if not isinstance(baseline_results, list):
-        errors.append("behavior baseline results must be an array")
-    else:
-        result_ids = [
-            result.get("case_id") if isinstance(result, dict) else None
-            for result in baseline_results
-        ]
-        if Counter(result_ids) != Counter(current_cases.keys()):
-            errors.append(
-                "behavior baseline must contain exactly one result for every current case"
-            )
-        rejudge_count = sum(
-            isinstance(result, dict)
-            and isinstance(result.get("lineage"), str)
-            and result["lineage"].startswith("explicit_rejudge_after_")
-            for result in baseline_results
-        )
-        if isinstance(acceptance, dict) and acceptance.get(
-            "explicit_rejudges"
-        ) != f"{rejudge_count}/{rejudge_count} PASS":
-            errors.append(
-                "behavior baseline acceptance must match explicit rejudge lineage"
-            )
-        for result in baseline_results:
-            if not isinstance(result, dict) or result.get("status") != "PASS":
-                errors.append("every behavior baseline result must be PASS")
-                continue
-            case_id = result.get("case_id")
-            current_case = current_cases.get(case_id) if isinstance(case_id, str) else None
-            current_digest = (
-                current_case_digests.get(case_id) if isinstance(case_id, str) else None
-            )
-            if current_case is None or current_digest is None:
-                errors.append(f"behavior baseline references an invalid case: {case_id!r}")
-            elif result.get("case_digest") != current_digest:
-                errors.append(
-                    f"behavior baseline case_digest does not match current case: {case_id}"
-                )
-            source_artifact = result.get("source_artifact")
-            source_input_sha256 = result.get("source_input_sha256")
-            source_result_sha256 = result.get("source_result_sha256")
-            lineage = result.get("lineage")
-            if (
-                not isinstance(source_artifact, str)
-                or not source_artifact.startswith(".artifacts/write-craft-evals/")
-                or ".." in Path(source_artifact).parts
-            ):
-                errors.append(f"behavior baseline source artifact is invalid: {case_id}")
-            elif raw_artifact_roots and not any(
-                source_artifact.startswith(f"{artifact_root}/")
-                for artifact_root in raw_artifact_roots
-            ):
-                errors.append(
-                    f"behavior baseline source artifact is outside its declared roots: {case_id}"
-                )
-            if not isinstance(source_input_sha256, str) or not SHA256.fullmatch(
-                source_input_sha256
-            ):
-                errors.append(f"behavior baseline input hash is invalid: {case_id}")
-            if not isinstance(source_result_sha256, str) or not SHA256.fullmatch(
-                source_result_sha256
-            ):
-                errors.append(f"behavior baseline result hash is invalid: {case_id}")
-            if lineage == "original":
-                if "original_failure" in result:
-                    errors.append(
-                        f"behavior baseline original result must not claim a failure: {case_id}"
-                    )
-            elif (
-                isinstance(lineage, str)
-                and lineage.startswith("explicit_rejudge_after_")
-                and lineage != "explicit_rejudge_after_"
-            ):
-                original_failure = result.get("original_failure")
-                if (
-                    not isinstance(original_failure, dict)
-                    or original_failure.get("status") != "ERROR"
-                    or not isinstance(original_failure.get("error"), str)
-                    or not original_failure["error"].strip()
-                    or not isinstance(original_failure.get("result_sha256"), str)
-                    or not SHA256.fullmatch(original_failure["result_sha256"])
-                ):
-                    errors.append(
-                        f"behavior baseline rejudge lineage is incomplete: {case_id}"
-                    )
-            else:
-                errors.append(f"behavior baseline lineage is invalid: {case_id}")
-            candidate = result.get("candidate")
-            judgment = result.get("judgment")
-            if not isinstance(candidate, str) or not candidate.strip():
-                errors.append("behavior baseline candidate must be non-empty")
-            elif result.get("candidate_sha256") != sha256_text(candidate):
-                errors.append("behavior baseline candidate_sha256 mismatch")
-            elif current_case is not None and isinstance(current_case.get("limits"), dict):
-                maximum = current_case["limits"].get("max_han_characters")
-                actual = han_character_count(candidate)
-                metrics = result.get("candidate_metrics")
-                if type(maximum) is int and actual > maximum:
-                    errors.append(
-                        f"behavior baseline candidate exceeds max_han_characters: {case_id}"
-                    )
-                if not isinstance(metrics, dict) or metrics.get("han_characters") != actual:
-                    errors.append(
-                        f"behavior baseline candidate metrics are invalid: {case_id}"
-                    )
-            if (
-                not isinstance(judgment, dict)
-                or judgment.get("schema") != "write-craft.judgment.v1"
-                or judgment.get("status") != "PASS"
-            ):
-                errors.append("behavior baseline judgment must be a PASS judgment.v1")
-            elif result.get("judgment_sha256") != sha256_text(canonical_json(judgment)):
-                errors.append("behavior baseline judgment_sha256 mismatch")
-            elif current_case is not None:
-                if judgment.get("case_id") != case_id:
-                    errors.append("behavior baseline judgment case_id mismatch")
-                expected = current_case.get("expected")
-                if not isinstance(expected, dict):
-                    errors.append(f"behavior baseline current case contract is invalid: {case_id}")
-                    continue
-                for field in ("must", "must_not"):
-                    criteria = expected.get(field)
-                    checks = judgment.get(field)
-                    if not isinstance(criteria, list) or not isinstance(checks, list):
-                        errors.append(
-                            f"behavior baseline judgment {field} is incomplete: {case_id}"
-                        )
-                        continue
-                    if len(checks) != len(criteria) or any(
-                        not isinstance(check, dict)
-                        or check.get("criterion") != criterion
-                        or check.get("status") != "PASS"
-                        or not isinstance(check.get("evidence"), str)
-                        or not check["evidence"].strip()
-                        for criterion, check in zip(criteria, checks)
-                    ):
-                        errors.append(
-                            f"behavior baseline judgment {field} does not match current contract: {case_id}"
-                        )
-                if judgment.get("blocking_issues") != []:
-                    errors.append(
-                        f"behavior baseline PASS judgment contains blocking issues: {case_id}"
-                    )
+            continue
+        errors.extend(validate_baseline_integrity(baseline_path, baseline))
 
     for path in product_text_files():
         text = path.read_text(encoding="utf-8")

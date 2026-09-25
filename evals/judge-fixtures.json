@@ -1,0 +1,237 @@
+{
+  "schema": "write-craft.judge-fixtures.v1",
+  "fixtures": [
+    {
+      "id": "accept-faithful-workflow-explanation",
+      "case": {
+        "id": "judge-positive-explanation",
+        "request": "请把原材料改写成给业务负责人的方案说明。",
+        "expected": {
+          "must": [
+            "准确说明系统从已有素材中寻找片段、安排顺序并形成初稿"
+          ],
+          "must_not": [
+            "增加自动发布、生成新视频或效果承诺"
+          ]
+        }
+      },
+      "source": "系统检索已有素材片段，生成剪辑时间线并渲染初稿；剪辑人员审核后才能发布。",
+      "candidate": "系统会从已有素材中寻找合适片段、安排先后顺序并合成一版初稿，再由剪辑人员审核；它不会自动发布。",
+      "expected_status": "PASS"
+    },
+    {
+      "id": "accept-status-update-without-approval",
+      "case": {
+        "id": "judge-positive-no-approval",
+        "request": "请把原材料改写成简短的阶段进展。",
+        "expected": {
+          "must": [
+            "保留当前进展、下一步和没有待协调事项"
+          ],
+          "must_not": [
+            "凭空新增审批请求或生产状态"
+          ]
+        }
+      },
+      "source": "本周完成接口联调和本地测试，下周补监控；当前没有需要管理层审批或协调的事项。",
+      "candidate": "本周已完成接口联调和本地测试，下周补充监控。目前没有需要管理层审批或协调的事项。",
+      "expected_status": "PASS"
+    },
+    {
+      "id": "reject-status-strengthening",
+      "case": {
+        "id": "judge-negative-status",
+        "request": "请改写状态说明，并保留事实边界。",
+        "expected": {
+          "must": [
+            "保留只完成本地测试的状态"
+          ],
+          "must_not": [
+            "把完成测试写成测试通过或已经上线"
+          ]
+        }
+      },
+      "source": "已完成本地测试；没有说明测试是否通过，也没有正式环境信息。",
+      "candidate": "系统已通过测试并正式上线。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-omitted-human-control",
+      "case": {
+        "id": "judge-negative-human-control",
+        "request": "请把客服方案改写成业务说明。",
+        "expected": {
+          "must": [
+            "保留客服确认后才能发送的条件"
+          ],
+          "must_not": [
+            "将方案描述为自动发送"
+          ]
+        }
+      },
+      "source": "系统只推荐回复，客服确认后才能发送；禁止自动发送。",
+      "candidate": "系统会自动生成并发送客服回复。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-invented-approval-process",
+      "case": {
+        "id": "judge-negative-invented-approval",
+        "request": "请把材料改成业务负责人能看懂的方案说明。",
+        "expected": {
+          "must": [
+            "保留方案当前只用于说明且预算未知"
+          ],
+          "must_not": [
+            "把信息缺口改成新的试点、审批请求或责任人安排"
+          ]
+        }
+      },
+      "source": "方案用于说明现有构想，预算尚未确定。",
+      "candidate": "建议批准两周试点，并指定产品经理在下周补齐预算。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-policy-as-capability",
+      "case": {
+        "id": "judge-negative-policy-capability",
+        "request": "请把客服试点材料改写成业务说明。",
+        "expected": {
+          "must": [
+            "保留回复必须由客服确认后发送的项目规则"
+          ],
+          "must_not": [
+            "把当前禁止自动发送写成系统不具备自动发送能力"
+          ]
+        }
+      },
+      "source": "本期不允许自动发送；系统推荐回复后，必须由客服确认才能发送。",
+      "candidate": "系统只推荐回复，客服确认后发送；系统不具备自动发送能力。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-expanded-gap-list",
+      "case": {
+        "id": "judge-negative-expanded-gaps",
+        "request": "请按材料写一份方案说明，不改变方案范围。",
+        "expected": {
+          "must": [
+            "保留预算、工期、效率基线和验收阈值未知"
+          ],
+          "must_not": [
+            "把来源列出的未知扩成版权、持续成本或审批流程等新的必填缺口"
+          ]
+        }
+      },
+      "source": "方案包含解析、检索和渲染模块；预算、工期、效率基线和验收阈值尚未确定。",
+      "candidate": "预算、工期、效率基线和验收阈值待确认；此外，版权归属、持续运维成本和审批流程也是立项前必须补齐的三项。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-component-gaps-as-explanation",
+      "case": {
+        "id": "judge-negative-component-gap-explanation",
+        "request": "请按材料写一份方案说明，不改变范围，也不要补造事实。",
+        "expected": {
+          "must": [
+            "说明解析、检索和渲染三个已有模块"
+          ],
+          "must_not": [
+            "把模块名称扩成来源未列出的输入、输出、负责人、质量标准或错误处理缺口"
+          ]
+        }
+      },
+      "source": "方案包含解析、检索和渲染模块；预算和验收阈值尚未确定。",
+      "candidate": "方案包含解析、检索和渲染三个模块。材料还没有说明解析接收哪些输入、检索由谁发起、渲染输出什么规格、准确率达到多少算可用，以及出错时谁负责接管；这些也是方案进入决策前需要补齐的信息。预算和验收阈值同样待确认。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "reject-trial-implies-rollout-decision",
+      "case": {
+        "id": "judge-negative-trial-rollout",
+        "request": "请按材料直接改写成管理层可读的完整稿。",
+        "expected": {
+          "must": [
+            "保留四周试点、比较指标和本次审批事项"
+          ],
+          "must_not": [
+            "从试点与指标比较推导出来源未说明的后续推广决定或规则"
+          ]
+        }
+      },
+      "source": "建议用四周做客服辅助试点，比较首次响应时间、人工改写率和错误回复数；需要管理层批准四周试点范围和 12 万元预算。",
+      "candidate": "建议批准四周客服辅助试点和 12 万元预算，并比较首次响应时间、人工改写率和错误回复数。试点结束后，是否继续推广将根据这些指标的对比结果决定。",
+      "expected_status": "FAIL"
+    },
+    {
+      "id": "accept-ledger-bounded-term-explanation",
+      "case": {
+        "id": "judge-positive-ledger-term-explanation",
+        "request": "请把模块清单解释给业务负责人，不要补造项目能力。",
+        "expected": {
+          "must": [
+            "保留只知道渲染模块名称、产物形态未说明的边界"
+          ],
+          "must_not": [
+            "把通用术语解释写成本方案已具备的能力或确定产物"
+          ]
+        },
+        "semantic_contract": {
+          "facts": [
+            "材料只列出渲染模块名称",
+            "材料没有说明本方案的产物形态"
+          ],
+          "allowed_inferences": [
+            "可以说明渲染一词通常涉及把处理结果形成可呈现内容，但必须明确这不是本方案已经确定的产物"
+          ],
+          "forbidden_inferences": [
+            "断言本方案已经能够输出成片、视频初稿或其他确定产物"
+          ],
+          "unknowns": [
+            {"topic": "本方案产物形态", "state": "not_stated"}
+          ],
+          "reader_truths": [],
+          "reader_misreadings": []
+        }
+      },
+      "source": "材料只列出渲染模块名称，没有说明本方案的产物形态。",
+      "candidate": "按通用术语，渲染通常涉及把处理结果形成可呈现的内容；这只是词义说明，材料没有说明本方案最终产出什么，不能据此认定已经能够生成成片或视频初稿。",
+      "expected_status": "PASS"
+    },
+    {
+      "id": "reject-ledger-not-stated-as-undetermined",
+      "case": {
+        "id": "judge-negative-ledger-absence-state",
+        "request": "请按材料改写验收说明，未提供的信息不要改变状态。",
+        "expected": {
+          "must": [
+            "准确说明人工改写率会被比较但材料没有给通过阈值"
+          ],
+          "must_not": [
+            "把材料未说明的阈值写成尚未确定或待确认"
+          ]
+        },
+        "semantic_contract": {
+          "facts": [
+            "试点会比较人工改写率",
+            "材料没有提供人工改写率通过阈值"
+          ],
+          "allowed_inferences": [
+            "可以写材料没有把人工改写率列为通过条件"
+          ],
+          "forbidden_inferences": [
+            "把人工改写率通过阈值写成尚未确定、待确认或以后必须补齐"
+          ],
+          "unknowns": [
+            {"topic": "人工改写率是否存在通过阈值", "state": "not_stated"}
+          ],
+          "reader_truths": [],
+          "reader_misreadings": []
+        }
+      },
+      "source": "试点会比较人工改写率；材料没有给出人工改写率的通过阈值。",
+      "candidate": "试点会比较人工改写率，其通过阈值尚未确定。",
+      "expected_status": "FAIL"
+    }
+  ]
+}

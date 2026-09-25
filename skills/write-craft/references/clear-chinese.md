@@ -15,6 +15,11 @@ the first reading without losing precision.
   acceptable when one idea requires qualification; they fail when several
   claims compete for attention.
 
+Before polishing sentences, write one private core sentence: “这是什么／现在到
+哪一步／这次读者最需要知道什么”. It is a compass, not a required opening.
+When evidence does not support a conclusion, the core can be a question,
+boundary, or progress statement instead of a confident claim.
+
 ## Put actors and actions back into the sentence
 
 Prefer “运营人员提交需求，剪辑人员审核初稿” to “实现需求提交与初稿审核闭环”.
@@ -28,6 +33,17 @@ Turn noun piles into actions:
 - “实现效率层面的全面提升” -> state whose time changes, in which step, and
   how it will be measured; otherwise mark it as an unverified goal.
 
+Do not inflate a short update. “已完成接口联调和本地测试；下周补监控，目前
+没有需要管理层协调的事项” is clearer than expanding three facts into a project
+proposal. `完成本地测试` still does not mean `测试通过` or `已经上线`.
+
+## Keep judgments beside their basis
+
+Place a conclusion next to the source-supported reason, condition, or evidence
+gap that qualifies it. For example: “方案值得继续比较，因为它复用现有素材；
+但尚无同批耗时对照，暂不能确认效率收益。” Do not add a reason merely to make
+the paragraph feel complete. If the source gives only a goal, call it a goal.
+
 ## Treat jargon deliberately
 
 For every term unfamiliar to the reader, choose one action:
@@ -40,6 +56,11 @@ For every term unfamiliar to the reader, choose one action:
 Do not replace a precise term with a vague benefit word. If the reader will
 meet the term in later discussions, withholding its name makes the document
 less useful.
+
+A plain-language rewrite must explain a term, not merely move it into a shorter
+sentence. For example, `120 个已缓存查询样本` can become `120 条能够直接从缓存中
+读取结果的查询`; keep the sample boundary and do not generalize that result to
+uncached queries, writes, or the whole system.
 
 ## Preserve qualifications
 
