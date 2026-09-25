@@ -33,19 +33,30 @@ send material, or an explanation of unrelated editing rules.
 
 In Diagnose, use `observed feature -> possible comprehension risk -> supported
 revision direction`. For example: “原稿先列实现组件，最后才说明业务目的” is an
-observed feature; “读者需要先接触实现信息，之后才能知道这些信息为何重要” is a
-bounded comprehension risk; “把原稿已有的业务目的移到组件说明之前” is a
+observed feature; “这种顺序可能让读者更难在接触组件时判断这些信息为何重要”
+is a bounded comprehension risk; “把原稿已有的业务目的移到组件说明之前” is a
 supported direction. Do not replace that chain with claims about how bosses
 usually read, what they know, or when they stop reading.
 
 Keep the middle step explicitly conditional: use “可能让……更难定位” or
-“读者需要先……之后才能……”, not unsupported conclusions such as “读者无法理解”
-or “只能读完全文才知道”. Diagnose only what the supplied text or summary makes
-observable. A summary that says components appear first does not establish that
-the source lacks role descriptions, inputs, outputs, or relationships. If the
-available material is enough for the requested diagnosis, deliver the bounded
-diagnosis without ending with requests to paste more material, choose a
-communication purpose, or ask for another rewrite.
+“读者可能需要先……再……”, not unqualified predictions such as “读者需要先……
+之后才能……”, “读者无法理解”, or “只能读完全文才知道”. Describe a missing
+relationship or reader task as a feature of the text, not as proof that a reader
+must guess, cannot understand, or will not know how to respond. Diagnose only
+what the supplied text or summary makes observable. A summary that says
+components appear first does not establish that the source lacks role
+descriptions, inputs, outputs, or relationships. If the available material is
+enough for the requested diagnosis, deliver the bounded diagnosis without
+ending with requests to paste more material, choose a communication purpose,
+or ask for another rewrite.
+Respect the source's stated completeness. If the user identifies the supplied
+text as the complete draft, do not relabel it as a summary, claim that the
+original wording was unavailable, or append a caveat about not having seen the
+full document.
+Distinguish information that is absent from information that appears too late
+or is hard to find. If the source states the business purpose near the end,
+diagnose its position; do not say that the document has no purpose or never
+explains what the work is for.
 When the source already states what each component does, acknowledge those
 actions and diagnose only the relationship, order, or decision framing that is
 actually absent. Treat an unstated reader task as an observed gap; do not turn

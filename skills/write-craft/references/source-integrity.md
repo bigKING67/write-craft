@@ -93,6 +93,12 @@ supported consequence unless the request or source defines the approval gate.
 A diagnosis must preserve facts that the source already explains. Do not call a
 component unexplained merely because its relationship to other components is
 missing.
+Likewise, a business purpose that appears late is not absent. Diagnose the
+placement or prominence of information without claiming the document never
+states it.
+Also preserve what the user says about source completeness. Complete supplied
+text must not be downgraded to a summary or accompanied by an invented caveat
+that the original wording or full document was unavailable.
 
 **Source excerpt**
 
@@ -106,7 +112,7 @@ missing.
 
 > 影响理解最大的不是四个组件“没有解释”，而是信息顺序和组件关系没有建立。
 >
-> - **业务目的出现得晚。** 原稿先连续说明四个组件各自做什么，最后才说明希望减少人工查找异常照片的时间。读者需要先接触实现信息，之后才能知道这些信息为何重要。可以把原稿已有的业务目的前移，再保留必要的组件说明。
+> - **业务目的出现得晚。** 原稿先连续说明四个组件各自做什么，最后才说明希望减少人工查找异常照片的时间。这种顺序可能让读者更难在接触组件时判断这些信息为何重要。可以把原稿已有的业务目的前移，再保留必要的组件说明。
 > - **组件动作已有，但关系未说明。** 原稿已经说明识别服务、索引库、任务队列和查询接口分别做什么；没有说明的是它们之间的先后、依赖或数据流。若原材料能支持这些关系，可以补充；如果不能，就保持并列说明，不要补造流程。
 > - **阅读任务没有交代。** 原稿明确没有说明负责人需要批准、选择或配合什么。诊断可以指出这一空缺，但不能替作者制造审批事项。
 
