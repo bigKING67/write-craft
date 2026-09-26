@@ -86,3 +86,34 @@ unpacked bytes), and diff checks passed. This batch is prepared for a local
 scoped commit. Human reading, real-media cases, exploration on this candidate,
 and release acceptance remain unverified. No installation, push, or release
 was performed.
+
+## Adjacent repetition follow-up
+
+The presentation reference now checks adjacent sentences and paragraphs for
+new information rather than merely different wording. The presentation case
+explicitly prohibits redundant evidence paraphrases, without rejecting useful
+independent summaries or acceptance checks. Two fixed fixtures preserve the
+actual r35 draft and a counterpart with only its duplicate paragraph removed.
+
+- `adjacent-repetition-calibration-r36`: 17/17 judgments matched expectations.
+  The unchanged r35 draft received FAIL; deleting only the duplicate evidence
+  paragraph produced PASS. Existing positive and negative fixtures also passed.
+- `adjacent-repetition-regression-r37`: both the scenario and presentation cases
+  passed on their first attempt, with zero revisions. The presentation draft no
+  longer contains the duplicate evidence paragraph. It preserves the proposed
+  state, workflow, human judgment, excluded scope, and unresolved commitments.
+
+These calls used Pi `deepseek/deepseek-flash`, low thinking for generation and
+fact judging, with raw JSONL storage disabled. Candidate Skill SHA-256:
+`794ae923b9775569eeb9dc1e5c3e2d19713d5b7732e29ba02f79ed45d846ab01`.
+Reported model costs were 0.014068683 for calibration and 0.022725183 for the
+targeted regression. Source validation, 35 local tests, package validation
+(15 entries, 76,973 unpacked bytes), and whitespace checks passed.
+
+Inspection still finds opportunities for concision: the presentation heading
+restates the evidence conclusion before the paragraph explains its basis, and
+the scenario mentions the unspecified current manual workflow. The specific
+duplicate-paragraph failure is now covered; uniformly concise prose is not
+established. This was a two-case targeted regression, not a rerun of all 18
+cases on this candidate. Independent reader stages and human reading were not
+run. No Feishu edit, installation, push, or release was performed.
