@@ -21,6 +21,9 @@ repository is pinned.
   layering, scenario use, and decision-relevant technical constraints.
 - `references/clear-chinese.md` owns Chinese expression, terminology, precision,
   and naturalness.
+- `references/document-presentation.md` owns platform-neutral visual hierarchy,
+  semantic emphasis, and rendered-document verification; platform writes stay
+  outside Write Craft.
 - `references/source-integrity.md` owns faithful explanation, two-way coverage,
   relevant unknowns, and unresolved source conflicts.
 - `references/reader-testing.md` owns fresh-context acceptance and fallback.

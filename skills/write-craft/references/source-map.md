@@ -20,3 +20,9 @@ in this table is not vendored and is not a runtime dependency.
 
 See the repository-level `upstreams.lock.json`, `THIRD_PARTY_NOTICES.md`, and
 `docs/upstream-absorption.md` for exact revisions and license handling.
+
+## Reviewed candidates not admitted as upstreams
+
+| Candidate | Reviewed revision | Decision | Reason |
+| --- | --- | --- | --- |
+| `aAAaqwq/AGI-Super-Team`, `feishu-doc-optimizer` | `b996aacc2987904c584316f91591f892ffdf5afd` (MIT) | Not admitted | Its useful hierarchy advice overlaps current guidance, while its tenant-specific reader and repeated whole-document browser deletion are outside Write Craft's runtime boundary. No source text, scripts, credentials, or destructive editing workflow were copied. The local presentation reference is an independent, platform-neutral response to live document evidence and the existing host document contract. |

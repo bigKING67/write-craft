@@ -93,6 +93,41 @@ necessary relationships, show one representative flow:
 4. what output is produced;
 5. how success and failure will be observed.
 
+For a product explanation to business readers, place a supported scenario near
+the opening when it helps explain the use before the architecture. Start with
+the user's task, supplied input, proposed action, and observable output; include
+the human role and boundary where supported. Keep approval requests or urgent
+decision-changing facts first when that is the reader's task. A scenario is not
+a compulsory opening for short updates, diagnoses, or sparse component lists.
+
+Distinguish the evidence behind a case:
+
+- A real case names only supplied materials, events, and observed results. Real
+  input material alone does not establish that a proposed output was produced.
+- An illustrative scenario explains supported behavior and is visibly labeled
+  as illustrative. It must not invent customer history, an old manual process,
+  pain, measured savings, capabilities, or successful results. A plausible
+  before/after table also needs source support on both sides.
+  For example, `目标减少人工核对时间` supports that goal, not `现在靠人工逐项
+  核对` as a description of the existing process. Explain the proposed task
+  directly when the current process is unspecified.
+- When the source says real materials are still being prepared, add a brief
+  relevant note and continue with the supported explanation. If the user has
+  deferred supplying them, do not repeatedly request them or make the otherwise
+  usable document depend on them. Do not call materials unfinished merely
+  because the source does not mention them.
+
+Give each presentation form a distinct job. A case can explain the use; steps
+can add actionable sequence; a table can compare choices or acceptance criteria.
+If these forms only repeat the same actors, inputs, actions, and outputs, merge
+or remove one. Preserve necessary emphasis on consequential boundaries and the
+independence of a short entry from its engineering appendix.
+This also applies to prose: after a complete scenario, omit a paragraph that
+only restates its purpose, output, and human boundary. For a usable explanation,
+do not append an inventory of facts you avoided inventing. Omit irrelevant
+absences; if one matters, retain `材料未说明` rather than claiming the activity or
+record does not exist.
+
 Label the scenario as an example when it is illustrative. Do not let an example
 silently become a promise that every case behaves the same way. Each actor,
 input, action, review point, output, and boundary must come from the source or a
@@ -191,6 +226,31 @@ The first paragraph establishes the proposed state and boundary. The second
 turns implementation nouns into a workflow. The third keeps the target beside
 the evidence gap. The last sentence preserves the communication purpose instead
 of manufacturing an approval request.
+
+### A scenario-led explanation with real materials pending
+
+**Source material (synthetic)**
+
+> 拟建设客服回复辅助工具。客服提交客户的问题和已批准的产品说明，系统据此起草回复。客服核对后自行发送；系统不直接联系客户。目标是减少起草时间，尚未做耗时对比。真实客户问题样例仍在整理，整理后由作者补进文档。本文向业务解释方案，不申请审批。材料未说明当前人工起草流程。
+
+**Request**
+
+> 写成老板和业务能理解的具体场景说明。先用示意场景，真实样例以后再补，不要再追问；不要重复堆案例、流程和表格。
+
+**Usable rewrite**
+
+> ## 客服回复辅助方案：先起草，由客服核对后发送
+>
+> **使用场景示意：**客服需要回复客户提出的产品问题时，将问题和已批准的产品说明交给拟建设的工具。系统据此起草回复，客服核对后自行发送。工具承担回复起草环节，不直接联系客户。
+>
+> 方案希望减少起草时间，但尚未做耗时对比，目前不能确认实际节省多少时间。本文用于说明方案，不申请审批。
+>
+> **真实样例待补：**客户问题样例仍在整理，准备完成后由作者补入文档。上面的场景用于解释拟议工作方式，不代表已经发生的服务案例。
+
+The scenario explains the whole supported use once. The following paragraphs
+add evidence state and the deferred input, rather than retelling it as steps
+and a table. It does not invent a customer's question, product facts, the old
+manual process, or savings to make the example vivid.
 
 ### When the source contains components but no workflow
 

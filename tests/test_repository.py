@@ -48,6 +48,7 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertTrue({"rewrite", "diagnose", "evidence", "routing", "reader-test"} <= tags)
         self.assertEqual(tracks, {"regression", "exploration"})
         self.assertIn("decision-entry-preserves-engineering-source", case_ids)
+        self.assertIn("formatted-document-uses-semantic-emphasis", case_ids)
         self.assertIn("approved-plan-preserves-editing-authority", case_ids)
         self.assertIn("proposal-mode-separates-new-suggestions", case_ids)
         self.assertIn("clean-delivery-without-process-commentary", case_ids)
@@ -225,6 +226,17 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("读者看完不知道如何回应", skill_text)
         self.assertIn("infer each component's business contribution", skill_text)
         self.assertIn("完整工程方案见文件二", skill_text)
+        self.assertIn("document-presentation.md", skill_text)
+        presentation_case = next(
+            case
+            for case in cases
+            if case["id"] == "formatted-document-uses-semantic-emphasis"
+        )
+        self.assertIn("presentation", presentation_case["tags"])
+        self.assertIn(
+            "颜色作为区分",
+            " ".join(presentation_case["expected"]["must_not"]),
+        )
         length_case = next(
             case for case in cases if case["id"] == "strict-total-length-budget"
         )

@@ -206,6 +206,13 @@ the request nor the source specifies an approval, owner, pilot, or next-step
 process, do not manufacture one from the gaps; explain what the supplied
 material supports and keep consequential unknowns visible.
 
+For a business-facing product or proposal explanation, prefer a concrete use
+scenario near the opening when the source supports it. Distinguish a real case
+from an illustrative scenario and material still to be supplied; an example
+label never licenses invented facts. Give the scenario, steps, and tables
+different jobs instead of repeating the same input-to-output sequence. See
+`decision-documents.md` for a complete example and the sparse-source fallback.
+
 Use an end-to-end scenario only when the supplied sources state or clearly
 entail every consequential actor, input, action, review point, output, and
 boundary included in it. A list of modules or capabilities is not a workflow.
@@ -282,6 +289,14 @@ and reason. Diagnose mode still returns diagnosis rather than a silent rewrite.
 Do not invent an approval request when the source is only a status update.
 Preserve the author's voice when a sample exists; clarity is not permission to
 replace it with a generic corporate voice.
+
+When the user asks for a substantive draft that will be delivered in Feishu,
+Word, Google Docs, or another formatted document, or asks to improve both the
+content and its visual hierarchy, read
+[references/document-presentation.md](references/document-presentation.md).
+It defines semantic presentation, not platform operations. Keep pure layout or
+document-platform requests outside Write Craft, and use the destination
+platform's document capability to apply and verify actual styles.
 
 Keep a short status update at the source's granularity. A source that says
 `本周完成接口联调和本地测试；下周处理监控；当前没有需管理层协调的事项`
