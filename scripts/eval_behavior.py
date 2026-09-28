@@ -4,6 +4,8 @@
 The generator loads only the repository Skill and may use the read tool so the
 Skill can open its progressive references. The judge runs in a fresh context
 without tools or skills. Model calls are opt-in and never run in CI.
+Models named `anthropic/<model>` or `claude-code/<model>` run through the local
+Claude Code CLI instead of Pi; structured-tool reviews still require Pi.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1032,11 +1035,20 @@ def parse_reader_judgment(text: str, case: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_command(args: list[str], timeout: int) -> dict[str, Any]:
+    if claude_code_model(args) is not None:
+        return run_claude_code(args, timeout)
+    return run_process(args, timeout)
+
+
+def run_process(
+    args: list[str], timeout: int, *, cwd: Path = ROOT, stdin: str | None = None
+) -> dict[str, Any]:
     started = time.monotonic()
     try:
         completed = subprocess.run(
             args,
-            cwd=ROOT,
+            cwd=cwd,
+            input=stdin,
             text=True,
             capture_output=True,
             check=False,
@@ -1108,6 +1120,112 @@ def pi_args(
         args.append("--no-tools")
     args.append(prompt)
     return args
+
+
+CLAUDE_CODE_PREFIXES = ("anthropic/", "claude-code/")
+SKILL_COMMAND = "/skill:write-craft"
+
+
+def claude_code_model(args: list[str]) -> str | None:
+    """Return the Claude model for a Pi command that should run in Claude Code."""
+    if not args or args[0] != "pi" or "--model" not in args:
+        return None
+    model = args[args.index("--model") + 1]
+    for prefix in CLAUDE_CODE_PREFIXES:
+        if model.startswith(prefix):
+            return model[len(prefix):]
+    return None
+
+
+def claude_code_invocation(args: list[str]) -> tuple[list[str], str]:
+    """Translate Pi arguments into a `claude -p` command and stdin prompt."""
+    model = claude_code_model(args)
+    if model is None:
+        raise ValueError("not a Claude Code model")
+    if "--extension" in args:
+        raise ContractError("structured-tool reviews are not supported through Claude Code")
+    prompt = args[-1]
+    command = [
+        "claude", "-p", "--model", model,
+        "--output-format", "stream-json", "--verbose",
+        "--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands",
+    ]
+    if "--skill" in args:
+        skill = Path(args[args.index("--skill") + 1]).resolve()
+        command += ["--tools", "Read", "--allowedTools", "Read", "--add-dir", str(skill)]
+        instruction = (
+            f"先用 Read 阅读 {skill / 'SKILL.md'}，并按其中要求读取 references 下的文件，"
+            "然后按该 Skill 完成任务。最终回复只输出成稿。"
+        )
+        if prompt.startswith(SKILL_COMMAND):
+            prompt = instruction + prompt[len(SKILL_COMMAND):]
+        else:
+            prompt = instruction + "\n\n" + prompt
+    else:
+        command += ["--tools", ""]
+    return command, prompt
+
+
+def claude_stream_to_pi_jsonl(stream: str, model: str) -> str:
+    """Convert Claude Code stream-json into the Pi events this evaluator reads."""
+    events: list[dict[str, Any]] = []
+    for line in stream.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if event.get("type") == "assistant" and isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use" \
+                        and block.get("name") == "Read":
+                    params = block.get("input") if isinstance(block.get("input"), dict) else {}
+                    read_args = {"path": params.get("file_path")}
+                    read_args.update({k: params[k] for k in ("offset", "limit") if k in params})
+                    events.append({"type": "tool_execution_start", "toolCallId": block.get("id"),
+                                   "toolName": "read", "args": read_args})
+        elif event.get("type") == "user" and isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    events.append({"type": "tool_execution_end",
+                                   "toolCallId": block.get("tool_use_id"),
+                                   "isError": bool(block.get("is_error"))})
+        elif event.get("type") == "result":
+            usage = event.get("usage") if isinstance(event.get("usage"), dict) else {}
+            counts = {
+                "input": usage.get("input_tokens", 0),
+                "output": usage.get("output_tokens", 0),
+                "cacheRead": usage.get("cache_read_input_tokens", 0),
+                "cacheWrite": usage.get("cache_creation_input_tokens", 0),
+            }
+            counts["totalTokens"] = sum(v for v in counts.values() if type(v) is int)
+            counts["cost"] = {"total": event.get("total_cost_usd") or 0.0}
+            text = event.get("result") if isinstance(event.get("result"), str) else ""
+            final: dict[str, Any] = {
+                "role": "assistant", "provider": "claude-code", "model": model,
+                "content": [{"type": "text", "text": text}], "usage": counts,
+                "stopReason": "error" if event.get("is_error") else "stop",
+            }
+            if event.get("is_error"):
+                final["errorMessage"] = text or str(event.get("subtype") or "error")
+            events.append({"type": "message_end", "message": final})
+    return "\n".join(json.dumps(event, ensure_ascii=False) for event in events)
+
+
+def run_claude_code(args: list[str], timeout: int) -> dict[str, Any]:
+    try:
+        command, prompt = claude_code_invocation(args)
+    except ContractError as exc:
+        return {"returncode": 2, "stdout": "", "stderr": str(exc),
+                "duration_seconds": 0.0, "timed_out": False}
+    # Run outside the repository so project CLAUDE.md files do not enter the context.
+    with tempfile.TemporaryDirectory(prefix="write-craft-claude-") as workdir:
+        completed = run_process(command, timeout, cwd=Path(workdir), stdin=prompt)
+    completed["stdout"] = claude_stream_to_pi_jsonl(completed["stdout"], command[3])
+    return completed
 
 
 def safe_message_metadata(message: dict[str, Any]) -> dict[str, Any]:
