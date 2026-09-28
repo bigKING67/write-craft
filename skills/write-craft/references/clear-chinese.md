@@ -163,18 +163,10 @@ Avoid decorative hedging; uncertainty should be specific enough to act on.
 
 ## Keep the whole answer within a hard length limit
 
-When the user gives an exact limit, apply it to every user-visible part unless
-the user explicitly narrows the limit to a named section. Titles, headings,
-table-cell text, appendices, notes, caveats, explanations of changes, and
-follow-up items all consume the same budget. Do not call a section “正文” and
-then place overflow below it.
-
-Count conservatively and leave margin instead of drafting to the exact edge.
-Shorten headings, remove repeated conclusions, flatten low-value structure,
-and combine compatible qualifications before removing a fact that changes the
-decision. If the requested limit cannot contain the recommendation plus its
-material evidence, constraints, and risk, make that trade-off explicit rather
-than silently exceeding the limit or deleting the boundary.
+`SKILL.md` defines what the limit covers. When drafting to it, count
+conservatively and leave margin instead of drafting to the exact edge. Shorten
+headings, remove repeated conclusions, flatten low-value structure, and combine
+compatible qualifications before removing a fact that changes the decision.
 
 ## Remove abstract filler
 

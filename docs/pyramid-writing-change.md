@@ -241,3 +241,11 @@ Pi DeepSeek Flash / low 定向复验复用r58报表简报与已保存的“无�
 结论限于单样本、主代理自拟材料和同一评审模型，不构成未见材料质量门槛或真人验收。工件在本地忽略目录 `plain-r59/`。
 
 评测脚本随后改为：`anthropic/<model>` 或 `claude-code/<model>` 经本机 `claude -p` 生成（在临时目录运行、只开放 Read、输出转换为既有 Pi 事件），结构化工具评审仍需 Pi。用该通道对同一长篇材料补跑 Sonnet，两版读取回执均成功、事实评审均 PASS；对照否定旧版 8、最终候选 5，最终候选另有一处标题与内容不符的编辑意见。仍为单样本。
+
+## 参考去重、情态保持与长篇回归（r60）
+
+新增回归用例 `long-plan-positive-entry`（虚构长篇合同审阅方案，源文在 `evals/fixtures/`），覆盖防御式限定照抄和编辑说明入正文。`decision-documents.md` 删去与前文重复的“Required scenario and appendix boundaries”一节（上表“必要边界部分”即指此节），把其中独有的附录取舍规则并入“Keep decision-changing constraints visible”，目录改为与实际标题一致，并删去客服示例中与“示意”标签重复的免责句；`clear-chinese.md` 的字数上限一节改为只保留起草技巧、范围定义以 `SKILL.md` 为准。
+
+首轮复测发现 r59 的 `SKILL.md` 示例直接取自上述长篇测试材料（合同、每天 100 份），且示范把“后续目标”移到扩量阶段，模型随即把“不要求”改写成“不涉及”“属于后续阶段”或“由人工处理”。改为与测试无关的示例，并明确 `不要求/暂不/先保留` 的情态不得改成排除、人工流程或后续承诺。
+
+复测（DeepSeek Flash/low 生成与评审，单样本）：四条相关回归用例 `strict-total-length-budget`、`decision-changing-technical-constraint`、`decision-entry-preserves-engineering-source`、`long-plan-positive-entry` 均 PASS；去重前版本对首轮失败的两条同样 PASS，说明首轮失败主要是波动与示例误导。长篇材料 DeepSeek、Claude Sonnet（Claude Code）PASS，GPT-5.5 仍漏写单类理由与复用待复核，与改动前表现一致。去掉泄漏示例后对照否定为 5—9 处，高于 r59 的 3—6 处；r59 的数字部分受示例与测试同源影响，不应作为改善幅度。

@@ -166,10 +166,15 @@ words in the right place, not with a disclaimer after every paragraph.
 
 A source's disclaimer is a condition to keep, not wording to copy. Rewrite it
 as the positive condition in its natural place; never delete it to reduce
-negations. For example, `条款类型相同只是候选条件，不代表都能套用同一规则` becomes
-`同类条款还要核对主体、金额和适用法律，再决定套用哪条规则`; `每天 100 份是后续目
-标，不是首期验收门槛` becomes the target stated only in the scale-up stage, with
-first-stage acceptance listing its own criteria.
+negations. For example, `格式相同只是初筛条件，不代表都能直接录入` becomes
+`格式相同的报名表还要核对姓名、日期和签字，再决定能否录入`.
+
+Keep the modality exact. `不要求`, `暂不`, and `先保留` state what the phase
+does not require; they are not `不做`, `不涉及`, `由人工处理`, or a promise that
+the item belongs to a later stage. `试点不要求建成完整平台` can become
+`试点只需做好单一类目，不需要完整平台`. A target such as `每天 200 张是后续目
+标，不是试点门槛` can move to the stage that pursues it only when the source
+places it there; otherwise keep the non-requirement where the scope is stated.
 
 If many sentences end in a `不/未/非` qualification, rewrite them as positive
 statements plus one status passage, then recheck the source in both directions.

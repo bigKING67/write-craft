@@ -8,11 +8,17 @@ to proceed. It is guidance, not a mandatory template.
 
 - Start from the decision
 - Find the load-bearing idea
+- Build a pyramid of findings
 - Design the first reading layer
-- Separate decision and engineering layers
-- Use scenarios, sections, and tables deliberately
-- Keep evidence and constraints visible
-- Learn from complete examples
+- Separate the decision entry from the engineering source when needed
+- Use a source-supported scenario
+- Layer the body by reader need
+- Use the lightest table that fits the reader's task
+- Keep decision-changing constraints visible (includes appendix rules)
+- Keep the evidence boundary explicit
+- A worked decision structure
+- Learn from complete synthetic examples
+- Complete restructuring: each paragraph contributes something different
 
 ## Start from the decision
 
@@ -236,7 +242,17 @@ A technical fact belongs in the main body when it changes any of these:
 - acceptance thresholds or quality risk.
 
 Explain the consequence in reader language, then place implementation mechanics
-in the appendix if further detail is useful.
+in the appendix if further detail is useful. Move detail to an appendix only when
+it does not change the decision.
+
+If the source supplies only decision-changing constraints and no implementation
+mechanism, keep the constraints in the body and omit the appendix. Do not invent
+placeholder mechanisms, new checks, owners, optionality, or `待补充` appendix
+items merely to satisfy an appendix request, and do not pad the explanation with
+hypothetical implementation examples. Omit the appendix cleanly: do not justify its absence by listing
+conventional fields such as components, interfaces, or deployment methods that
+the source did not mention, and do not add
+`来源没有实现细节`, `没有可放入附录的内容`, or any other explanation for it.
 
 ## Keep the evidence boundary explicit
 
@@ -331,9 +347,9 @@ stay outside the usable draft.
 >
 > **使用场景示意：**客服需要回复客户提出的产品问题时，将问题和已批准的产品说明交给拟建设的工具。系统据此起草回复，客服核对后自行发送。工具承担回复起草环节，不直接联系客户。
 >
-> 方案希望减少起草时间，但尚未做耗时对比，目前不能确认实际节省多少时间。本文用于说明方案，不申请审批。
+> 方案希望减少起草时间，实际节省多少尚未做耗时对比。本文用于说明方案，不申请审批。
 >
-> **真实样例待补：**客户问题样例仍在整理，准备完成后由作者补入文档。上面的场景用于解释拟议工作方式，不代表已经发生的服务案例。
+> **真实样例待补：**客户问题样例仍在整理，准备完成后由作者补入文档。
 
 The scenario explains the whole supported use once. The following paragraphs
 add evidence state and the deferred input, rather than retelling it as steps
@@ -395,44 +411,6 @@ source is sufficient, completeness means organizing what is there and stopping.
 For an approved plan, the same method improves explanation without reopening
 scope. For a request that explicitly permits plan changes, put new suggestions
 in a separate proposal section and label their effect on the approved baseline.
-
-## Required scenario and appendix boundaries
-
-For a business-facing product or proposal explanation, prefer a concrete use
-scenario near the opening when the source supports it. Distinguish a real case
-from an illustrative scenario and material still to be supplied; an example
-label never licenses invented facts. Give the scenario, steps, and tables
-different jobs instead of repeating the same input-to-output sequence. See
-`decision-documents.md` for a complete example and the sparse-source fallback.
-
-Use an end-to-end scenario only when the supplied sources state or clearly
-entail every consequential actor, input, action, review point, output, and
-boundary included in it. A list of modules or capabilities is not a workflow.
-When the source does not provide the people or sequence, explain the proposal
-at the supported component or capability level; do not turn those omissions
-into invented steps or new `待确认` items merely to make the scenario look
-complete. Include source-supported scope, non-goals, delivery stages,
-acceptance, resources, trade-offs, risks, and fallbacks only at the depth this
-reader's task needs. Do not force every document into the same headings.
-
-Move implementation detail to an appendix only when it does not change the
-decision. A technical constraint stays in the main body when it affects cost,
-schedule, feasibility, risk, quality, compliance, or what must be approved.
-If the source supplies only decision-changing constraints and no implementation
-mechanism, keep the constraints in the body and omit the appendix. Do not invent
-placeholder mechanisms, new checks, owners, optionality, or `待补充` appendix
-items merely to satisfy an appendix request. Do not pad the explanation with
-hypothetical examples of implementation details that the source never supplied.
-Omit the appendix cleanly; do not justify its absence by listing conventional
-fields such as components, interfaces, or deployment methods that the source
-did not mention. When the material supplies only the decision-changing
-constraints, deliver those constraints and stop: do not add `来源没有实现细节`,
-`没有可放入附录的内容`, or any other explanation for the missing appendix.
-
-When the user requests both a standalone decision entry and a preserved
-engineering source, make the short entry self-contained and add an explicit
-pointer such as `完整工程方案见文件二` or the supplied attachment name. Merely
-placing the full plan later in the same response does not create that pointer.
 
 ## Complete restructuring: each paragraph contributes something different
 
