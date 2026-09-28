@@ -145,6 +145,36 @@ example to distinguish a paragraph's contribution from its topic. Apply its
 scenario, appendix and separate-decision-entry rules when
 those forms are requested or useful; their source boundaries remain mandatory.
 
+## Say what is true, once
+
+Faithful is not defensive. Carry uncertainty and limits with accurate status
+words in the right place, not with a disclaimer after every paragraph.
+
+- Write what the work does, has, needs, or has not yet verified. Use a
+  `不是……` or `不代表……` contrast only when the source or the reader's task
+  shows a likely misreading; do not pre-empt misreadings nobody has.
+- Give each boundary, status, and unknown one home. Put scope beside what it
+  limits and collect evidence limits and open items in one status passage.
+  Later sections and appendices point to it instead of restating it.
+- Mark an illustration once with `例如` or `示意`; do not add a sentence
+  explaining what the example is not.
+- Name only exclusions a reader would otherwise assume are included.
+- Keep the rewrite's own process out of the document. `本次仅重组表达` or
+  `本文未修改代码` describes an edit; drop it rather than turning it into a
+  claim about the work such as `代码尚未调整`. Keep the work's own evidence
+  state when the source gives it, such as `现有渲染能力待复核`.
+
+A source's disclaimer is a condition to keep, not wording to copy. Rewrite it
+as the positive condition in its natural place; never delete it to reduce
+negations. For example, `条款类型相同只是候选条件，不代表都能套用同一规则` becomes
+`同类条款还要核对主体、金额和适用法律，再决定套用哪条规则`; `每天 100 份是后续目
+标，不是首期验收门槛` becomes the target stated only in the scale-up stage, with
+first-stage acceptance listing its own criteria.
+
+If many sentences end in a `不/未/非` qualification, rewrite them as positive
+statements plus one status passage, then recheck the source in both directions.
+[references/clear-chinese.md](references/clear-chinese.md) has a worked example.
+
 ## Make the language clear without hollowing it out
 
 For every Draft or Rewrite and for sentence-level editing, read

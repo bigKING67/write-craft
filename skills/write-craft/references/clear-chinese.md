@@ -73,6 +73,38 @@ once. It preserves who does what and when; it adds no reason, benefit or approva
 gate. A separate acceptance check about procurement would serve a different
 purpose and should not be deleted merely for mentioning the same boundary.
 
+### Example: replace defensive disclaimers with positive statements
+
+This is synthetic material. The draft is faithful but defends every sentence;
+the reader has to strip the negations to find what will happen.
+
+**Defensive draft**
+
+> 本方案先在家居类目试点自动生成商品详情图，出图质量合格后再扩展类目和产量。这是实施顺序，不是缩减完整需求，目前仍是待验证方案。这里选家居类目仅用于说明流程，不代表最终类目。
+>
+> 试点不要求覆盖全部类目，也不要求建成完整设计平台。每天 200 张是后续目标，不是试点验收门槛。
+>
+> 此前的内部演示使用固定模板，只能说明生成链路曾经跑通，不能证明真实商品的出图质量。本文仅重组表达，未修改代码或部署。
+>
+> 附录：实施说明。试点不要求覆盖全部类目或完整设计平台，每天 200 张不作为试点门槛……
+
+**Edited draft**
+
+> 先用一个类目试点自动生成商品详情图，出图质量合格后再扩展类目和产量，目标是每天 200 张。下文以家居类目为例，试点类目由运营确认。
+>
+> 试点只要求做好一个类目的出图，不要求建成完整设计平台。
+>
+> **现状**：内部演示用固定模板跑通了生成链路，真实商品的出图质量尚未验证。
+>
+> 附录：实施说明（试点范围见正文）……
+
+The edit keeps every supported fact: the sequence, the full goal, the example
+status of the category, the later target, the excluded platform, and the
+evidence limit of the demo. The sequence now carries “not a reduction” without
+saying so; the limit is stated once as a status; the appendix points back
+instead of repeating the scope; the author's editing note is gone because it
+is not about the work.
+
 ## Put actors and actions back into the sentence
 
 Prefer “运营人员提交需求，剪辑人员审核初稿” to “实现需求提交与初稿审核闭环”.
@@ -106,7 +138,8 @@ For every term unfamiliar to the reader, choose one action:
   reuse it consistently.
 - **Cut:** remove detail that does not help this reader understand or decide.
 
-Do not replace a precise term with a vague benefit word. If the reader will
+Do not replace a precise term with a vague benefit word, and do not
+infantilize a non-technical reader by removing precision. If the reader will
 meet the term in later discussions, withholding its name makes the document
 less useful.
 
@@ -199,30 +232,13 @@ measurement of elapsed time are distinct questions; preserve that distinction.
 After editing, recheck facts, conditions, authority, and the total length. Do not
 trade meaning for smoothness or describe self-editing as an independent test.
 
-## Language and precision
-
-Prefer explicit actors, actions, conditions, and results. Give each paragraph
-one job. Replace a technical term when a plain equivalent is accurate; explain
-it once when the reader needs the term again; cut it when it serves only the
-author. Keep exact numbers, conditions, uncertainty, and the distinction between
-`不能` and `尚未`.
-
-A plain-language rewrite must unpack a scope-bearing term, not just move it
-into a shorter sentence. For example, explain `已缓存查询` as `能够直接从缓存中
-读取结果的查询`, while keeping the sample boundary and the untested write and
-cache-miss cases visible.
-
-Do not use abstract words such as “赋能”“闭环”“智能化”“全面提升” as substitutes
-for a mechanism, owner, result, or test. Do not infantilize a non-technical
-reader or remove precision merely to shorten the document.
-
 ## Final reader check
 
 Before delivery, confirm that a reader can identify:
 
 - what problem or opportunity matters;
 - what is recommended and why;
-- what is in and out of scope;
+- what is in scope, and any exclusion they would otherwise assume;
 - what evidence is known and what remains unverified;
 - what resources, risks, and trade-offs matter;
 - what, if anything, they must decide or do next.
