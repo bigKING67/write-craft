@@ -109,8 +109,11 @@ indefinitely for minor preferences.
 
 ## Fallback prompt
 
-When no independent context is available or authorized, provide this prompt for
-a new conversation without claiming the test was executed:
+When no independent context is available or authorized, do not claim the test
+was executed. Provide this prompt for a new conversation only when the user asks
+for a testing aid; do not append it to clean copy by default. When validation
+status is requested or required for acceptance, report the unrun check separately
+without substituting this prompt for evidence:
 
 ```text
 你是一名没有参与该项目、不了解此前讨论的独立读者。只根据下面的最终文档回答问题；不要用常识补齐文档没有提供的信息。

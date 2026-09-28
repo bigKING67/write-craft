@@ -83,6 +83,15 @@ const submitFactJudgment = defineTool({
 				description: "Prohibited behaviors in original order, identified by 1-based criterion_index and classified by presence.",
 			}),
 			blocking_issues: Type.Array(NonEmptyString),
+			editorial: Type.Object({
+				schema: StringEnum(["write-craft.editorial.v1"] as const),
+				issues: Type.Array(Type.Object({
+					kind: StringEnum(["redundancy", "irrelevant_commentary", "structure", "sentence", "wording", "presentation"] as const),
+					quote: NonEmptyString,
+					reason: NonEmptyString,
+					suggestion: NonEmptyString,
+				}, { additionalProperties: false })),
+			}, { additionalProperties: false }),
 		},
 		{ additionalProperties: false },
 	),

@@ -28,21 +28,26 @@ from scripts.eval_behavior import (
     han_character_count,
     judge_prompt,
     load_judge_fixtures,
+    main as eval_main,
     normalize_fact_tool_arguments,
     parse_judgment,
     parse_reader_judgment,
     parse_reader_response,
     pi_args,
+    skill_read_trace,
     persist_raw_jsonl,
     reader_prompt,
     reader_judgment_prompt,
     rejudge_case,
     revision_prompt,
+    run_editorial_review,
+    run_fact_review,
     resolved_case_digest,
     select_cases,
     sha256_text,
     structured_output_metadata,
     validate_payload,
+    validate_editorial,
 )
 
 
@@ -92,6 +97,7 @@ def fact_tool_arguments(judgment: dict[str, object]) -> dict[str, object]:
             for index, check in enumerate(judgment["must_not"], start=1)
         ],
         "blocking_issues": judgment["blocking_issues"],
+        "editorial": {"schema": "write-craft.editorial.v1", "issues": []},
     }
 
 
@@ -147,6 +153,57 @@ def sample_reader_case() -> dict[str, object]:
 
 
 class BehaviorEvaluationTests(unittest.TestCase):
+    def test_skill_read_trace_records_results_without_private_contents(self):
+        from scripts import eval_behavior as b
+        events = [
+            {"type": "tool_execution_start", "toolName": "read", "toolCallId": "a",
+             "args": {"path": str(b.SKILL_ROOT / "SKILL.md"), "offset": 1, "limit": 20}},
+            {"type": "tool_execution_start", "toolName": "read", "toolCallId": "b",
+             "args": {"path": "/private/SECRET-NAME"}},
+            {"type": "tool_execution_end", "toolCallId": "b", "isError": True,
+             "result": {"text": "SECRET-CONTENT"}},
+            {"type": "tool_execution_end", "toolCallId": "a", "isError": False},
+            {"type": "tool_execution_start", "toolName": "read", "toolCallId": "c",
+             "args": {"path": str(b.SKILL_ROOT / "references/source-integrity.md")}},
+            {"type": "message_update", "text": "PRIVATE-REASONING"},
+        ]
+        result = skill_read_trace("\n".join(json.dumps(x) for x in events))
+        self.assertEqual([x["status"] for x in result["reads"]],
+                         ["SUCCEEDED", "FAILED", "UNCONFIRMED"])
+        self.assertEqual(result["reads"][0],
+                         {"path": "SKILL.md", "status": "SUCCEEDED", "offset": 1, "limit": 20})
+        self.assertNotIn("SECRET", json.dumps(result))
+        self.assertNotIn("PRIVATE-REASONING", json.dumps(result))
+        self.assertEqual(skill_read_trace("bad json")["malformed_lines"], 1)
+        self.assertEqual(skill_read_trace("")["reads"], [])
+
+    def test_editorial_is_separate_and_quotes_are_checked(self) -> None:
+        clean = {"schema": "write-craft.editorial.v1", "issues": []}
+        self.assertEqual(validate_editorial(clean)["status"], "NO_ISSUES_FOUND")
+        issue = {"kind": "redundancy", "quote": "无。没有协调事项。",
+                 "reason": "同一状态连续重述", "suggestion": "保留一次"}
+        report = {"schema": "write-craft.editorial.v1", "issues": [issue]}
+        self.assertEqual(validate_editorial(report, issue["quote"])["status"], "NEEDS_EDIT")
+        with self.assertRaises(ContractError):
+            validate_editorial(report, "其他正文")
+        with self.assertRaises(ContractError):
+            validate_editorial({"schema": "write-craft.editorial.v1", "issues": [{}]})
+
+    def test_legacy_judgment_does_not_gain_editorial_pass(self) -> None:
+        case = {"id": "legacy", "expected": {"must": [], "must_not": []}}
+        args = {"schema": "write-craft.judgment.v1", "case_id": "legacy",
+                "must": [], "must_not": [], "blocking_issues": []}
+        legacy = normalize_fact_tool_arguments(args, case)
+        self.assertNotIn("editorial", parse_judgment(json.dumps(legacy), case))
+        with self.assertRaises(ContractError):
+            normalize_fact_tool_arguments(args, case, require_editorial=True)
+        args["editorial"] = {"schema": "write-craft.editorial.v1", "issues": [
+            {"kind": "wording", "quote": "进行进行检查", "reason": "动词重复",
+             "suggestion": "删去多余动词"}]}
+        current = normalize_fact_tool_arguments(args, case, require_editorial=True)
+        self.assertEqual(current["status"], "PASS")
+        self.assertEqual(current["editorial"]["status"], "NEEDS_EDIT")
+
     def test_contract_requires_safe_single_source(self) -> None:
         with tempfile.TemporaryDirectory() as raw_root:
             root = Path(raw_root)
@@ -704,6 +761,176 @@ class BehaviorEvaluationTests(unittest.TestCase):
         self.assertIn("删除无来源比例", prompt)
         self.assertIn("编造数据", prompt)
         self.assertNotIn('"criterion": "保留事实"', prompt)
+
+    def test_editorial_correction_shares_budget_and_rechecks_facts(self) -> None:
+        issue = {"kind": "redundancy", "quote": "范围不变。范围不变。",
+                 "reason": "相邻两句重复同一边界", "suggestion": "保留一次范围声明"}
+        for budget, remaining, focused in ((0, True, False), (1, False, False),
+                                          (1, True, False), (0, True, True), (1, False, True)):
+            with self.subTest(budget=budget, remaining=remaining, focused=focused):
+                case = sample_case()
+                case["max_revisions"] = budget
+                initial = {
+                    "schema": "write-craft.judgment.v1", "case_id": case["id"],
+                    "status": "PASS",
+                    "must": [{"criterion": text, "status": "PASS", "evidence": "保留"}
+                             for text in case["expected"]["must"]],
+                    "must_not": [{"criterion": text, "status": "PASS", "evidence": "未出现"}
+                                 for text in case["expected"]["must_not"]],
+                    "blocking_issues": [],
+                }
+                initial_args = fact_tool_arguments(initial)
+                initial_args["editorial"]["issues"] = [issue]
+                final_args = fact_tool_arguments(initial)
+                if remaining:
+                    final_args["editorial"]["issues"] = [issue]
+                    final_args["blocking_issues"] = ["编辑后新增无来源状态"]
+                outputs = [pi_text_output(issue["quote"])]
+                if focused:
+                    outputs.append(pi_text_output(json.dumps({
+                        "schema": "write-craft.editorial.v1", "issues": [issue]
+                    }, ensure_ascii=False)))
+                outputs.append(pi_tool_output(FACT_JUDGMENT_TOOL, initial_args))
+                if budget:
+                    outputs.append(pi_text_output(issue["quote"] if remaining else "范围不变。"))
+                    if focused:
+                        outputs.append(pi_text_output(json.dumps({
+                            "schema": "write-craft.editorial.v1", "issues": []
+                        })))
+                    outputs.append(pi_tool_output(FACT_JUDGMENT_TOOL, final_args))
+                with tempfile.TemporaryDirectory() as raw_dir, patch(
+                    "scripts.eval_behavior.run_command", side_effect=outputs
+                ) as mocked:
+                    result = evaluate_case(
+                        case=case, run_index=1, output_root=Path(raw_dir),
+                        model="generator/model", judge_model="judge/model",
+                        reader_model="reader/model", reader_judge_model="reader/model",
+                        thinking="low", judge_thinking="low", reader_thinking="low",
+                        reader_judge_thinking="low", timeout=1,
+                        focused_editorial=focused,
+                    )
+                    self.assertEqual(mocked.call_count, (2 + int(focused)) * (1 + budget))
+                    self.assertEqual(result["revisions_used"], budget)
+                    self.assertEqual(result["editorial"]["status"],
+                                     "NEEDS_EDIT" if remaining else "NO_ISSUES_FOUND")
+                    self.assertEqual(result["status"], "FAIL" if budget and remaining else "PASS")
+                    if budget:
+                        self.assertEqual(result["initial_attempt"]["status"], "PASS")
+                        self.assertEqual(result["initial_attempt"]["editorial"]["status"], "NEEDS_EDIT")
+                        self.assertIn(issue["reason"], mocked.call_args_list[2 + int(focused)].args[0][-1])
+                        self.assertTrue((Path(raw_dir) / "sample--1" / "initial" / "candidate.md").exists())
+
+    def test_focused_editorial_rejects_invented_quotes_without_retry(self) -> None:
+        report = {"schema": "write-craft.editorial.v1", "issues": [{
+            "kind": "redundancy", "quote": "稿件中不存在的句子",
+            "reason": "重复", "suggestion": "删除"}]}
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "scripts.eval_behavior.run_command", return_value=pi_text_output(json.dumps(report))
+        ) as mocked:
+            result = run_editorial_review(
+                case=sample_case(), candidate="实际稿件", model="judge/model", thinking="low",
+                timeout=1, output_dir=Path(directory) / "editorial",
+            )
+            self.assertEqual(result["status"], "ERROR")
+            self.assertIn("quote not found", result["error"])
+            mocked.assert_called_once()
+
+    def test_focused_cli_does_not_exit_success_for_unresolved_editing(self) -> None:
+        for focused, editorial, code in ((True, "NEEDS_EDIT", 1),
+                                          (True, "NO_ISSUES_FOUND", 0),
+                                          (False, "NEEDS_EDIT", 0)):
+            with self.subTest(focused=focused, editorial=editorial), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "run"
+                argv = ["--model", "test", "--judge-model", "test", "--output-dir", str(output)]
+                if focused:
+                    argv.append("--focused-editorial")
+                with patch("scripts.eval_behavior.load_cases", return_value=[sample_case()]), \
+                     patch("scripts.eval_behavior.select_cases", return_value=[sample_case()]), \
+                     patch("scripts.eval_behavior.evaluate_case", return_value={
+                         "status": "PASS", "editorial": {"status": editorial}
+                     }) as evaluate, \
+                     patch("scripts.eval_behavior.pi_version", return_value="test"), \
+                     patch("scripts.eval_behavior.git_state", return_value={}), \
+                     patch("scripts.eval_behavior.skill_digest", return_value="test"), \
+                     patch("builtins.print"):
+                    self.assertEqual(eval_main(argv), code)
+                self.assertEqual(evaluate.call_args.kwargs["focused_editorial"], focused)
+                summary = json.loads((output / "run.json").read_text())
+                self.assertEqual(summary["status"], "PASS")
+                self.assertEqual(summary["editorial_status"], editorial)
+
+    def test_calibration_rejects_case_filter_instead_of_running_every_fixture(self) -> None:
+        with patch("scripts.eval_behavior.run_command") as run, patch("builtins.print"):
+            self.assertEqual(eval_main(["--calibrate-judge", "--case", "one-fixture",
+                                        "--judge-model", "test"]), 2)
+            run.assert_not_called()
+
+    def test_focused_suggestion_is_not_automatically_a_confirmed_issue(self) -> None:
+        case = {"id": "advisory", "request": "说明状态", "expected": {"must": [], "must_not": []}}
+        suggestion = {"kind": "redundancy", "quote": "拟试用，尚未试用。",
+                      "reason": "候选意见：两处都是未实施", "suggestion": "删去尚未试用"}
+        outputs = [pi_text_output(json.dumps({"schema": "write-craft.editorial.v1", "issues": [suggestion]})),
+                   pi_tool_output(FACT_JUDGMENT_TOOL, {"schema": "write-craft.judgment.v1",
+                       "case_id": "advisory", "must": [], "must_not": [], "blocking_issues": [],
+                       "editorial": {"schema": "write-craft.editorial.v1", "issues": []}})]
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "scripts.eval_behavior.run_command", side_effect=outputs
+        ) as run:
+            result = run_fact_review(case=case, source="拟试用，尚未试用。", candidate="拟试用，尚未试用。",
+                                     model="judge/model", thinking="low", timeout=1,
+                                     output_dir=Path(directory), focused_editorial=True)
+            self.assertEqual(run.call_count, 2)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["judgment"]["editorial"]["status"], "NO_ISSUES_FOUND")
+            self.assertIn(suggestion["reason"], run.call_args_list[1].args[0][-1])
+
+    def test_focused_adjudication_rejects_new_editorial_issues(self) -> None:
+        case = {"id": "advisory", "request": "说明状态",
+                "expected": {"must": [], "must_not": []}}
+        candidate = "尚未开始。时间未定。"
+        issue = {"kind": "presentation", "quote": "时间未定。",
+                 "reason": "希望换个位置", "suggestion": "移动句子"}
+        proposals = [[], [{**issue, "kind": "redundancy"}],
+                     [{**issue, "quote": "尚未开始。"}]]
+        for proposed in proposals:
+            with self.subTest(proposed=proposed), tempfile.TemporaryDirectory() as directory:
+                outputs = [pi_text_output(json.dumps({
+                    "schema": "write-craft.editorial.v1", "issues": proposed})),
+                    pi_tool_output(FACT_JUDGMENT_TOOL, {
+                        "schema": "write-craft.judgment.v1", "case_id": "advisory",
+                        "must": [], "must_not": [], "blocking_issues": [],
+                        "editorial": {"schema": "write-craft.editorial.v1",
+                                      "issues": [issue]}})]
+                with patch("scripts.eval_behavior.run_command", side_effect=outputs) as run:
+                    result = run_fact_review(
+                        case=case, source=candidate, candidate=candidate,
+                        model="judge/model", thinking="low", timeout=1,
+                        output_dir=Path(directory), focused_editorial=True)
+                self.assertEqual(run.call_count, 2)
+                self.assertEqual(result["status"], "ERROR")
+                self.assertIn("unproposed editorial issue", result["error"])
+                self.assertNotIn("judgment", result)
+
+    def test_empty_editorial_candidates_do_not_hide_new_fact_errors(self) -> None:
+        case = {"id": "advisory", "request": "说明状态",
+                "expected": {"must": [], "must_not": []}}
+        outputs = [pi_text_output(json.dumps({
+            "schema": "write-craft.editorial.v1", "issues": []})),
+            pi_tool_output(FACT_JUDGMENT_TOOL, {
+                "schema": "write-craft.judgment.v1", "case_id": "advisory",
+                "must": [], "must_not": [], "blocking_issues": ["无依据声称已经上线"],
+                "editorial": {"schema": "write-craft.editorial.v1", "issues": []}})]
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "scripts.eval_behavior.run_command", side_effect=outputs
+        ) as run:
+            result = run_fact_review(
+                case=case, source="尚未上线", candidate="已经上线",
+                model="judge/model", thinking="low", timeout=1,
+                output_dir=Path(directory), focused_editorial=True)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["blocking_issues"], ["无依据声称已经上线"])
+        self.assertEqual(result["judgment"]["editorial"]["status"], "NO_ISSUES_FOUND")
 
     def test_deterministic_length_limit_counts_the_whole_candidate(self) -> None:
         case = sample_case()

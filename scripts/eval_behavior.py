@@ -455,6 +455,9 @@ def load_judge_fixtures(path: Path = JUDGE_FIXTURES_PATH) -> list[dict[str, Any]
             raise ContractError(
                 f"judge fixture {fixture_id} expected_status must be PASS or FAIL"
             )
+        if ("expected_editorial_status" in fixture and fixture["expected_editorial_status"]
+                not in {"NEEDS_EDIT", "NO_ISSUES_FOUND"}):
+            raise ContractError("invalid expected_editorial_status")
     return fixtures
 
 
@@ -616,11 +619,13 @@ def parse_judgment(text: str, case: dict[str, Any]) -> dict[str, Any]:
             f"judge status {payload.get('status')!r} does not match computed status {computed}"
         )
     payload["status"] = computed
+    if "editorial" in payload:
+        payload["editorial"] = validate_editorial(payload["editorial"])
     return payload
 
 
 def normalize_fact_tool_arguments(
-    arguments: dict[str, Any], case: dict[str, Any]
+    arguments: dict[str, Any], case: dict[str, Any], *, require_editorial: bool = False
 ) -> dict[str, Any]:
     """Convert the unambiguous tool protocol into the persisted judgment schema."""
     presence_to_status = {
@@ -687,6 +692,10 @@ def normalize_fact_tool_arguments(
         "must_not": normalized_must_not,
         "blocking_issues": arguments.get("blocking_issues"),
     }
+    if require_editorial and "editorial" not in arguments:
+        raise ContractError("live fact judgment requires editorial review")
+    if "editorial" in arguments:
+        normalized["editorial"] = validate_editorial(arguments["editorial"])
     statuses = [
         check.get("status")
         for field in ("must", "must_not")
@@ -704,6 +713,27 @@ def normalize_fact_tool_arguments(
         else "UNCERTAIN"
     )
     return normalized
+
+
+def validate_editorial(payload: Any, candidate: str | None = None) -> dict[str, Any]:
+    """Separate located editorial observations from the legacy contract verdict."""
+    if not isinstance(payload, dict) or payload.get("schema") != "write-craft.editorial.v1":
+        raise ContractError("editorial schema must be write-craft.editorial.v1")
+    issues = payload.get("issues")
+    if not isinstance(issues, list):
+        raise ContractError("editorial issues must be an array")
+    for issue in issues:
+        if not isinstance(issue, dict) or issue.get("kind") not in {
+            "redundancy", "irrelevant_commentary", "structure", "sentence", "wording", "presentation"
+        }:
+            raise ContractError("editorial issue kind is invalid")
+        for field in ("quote", "reason", "suggestion"):
+            if not isinstance(issue.get(field), str) or not issue[field].strip():
+                raise ContractError(f"editorial {field} must be non-empty")
+        if candidate is not None and issue["quote"] not in candidate:
+            raise ContractError("editorial quote not found in candidate")
+    return {"schema": "write-craft.editorial.v1", "issues": issues,
+            "status": "NEEDS_EDIT" if issues else "NO_ISSUES_FOUND"}
 
 
 def generator_prompt(case: dict[str, Any], source: str) -> str:
@@ -740,6 +770,7 @@ def revision_prompt(
             "status": judgment["status"],
             "blocking_issues": judgment["blocking_issues"],
             "failed_or_uncertain_checks": failed_checks,
+            "editorial_issues": judgment.get("editorial", {}).get("issues", []),
         },
         ensure_ascii=False,
         indent=2,
@@ -750,6 +781,7 @@ def revision_prompt(
 
 要求：
 - 修复反馈指出的事实、遗漏和交付问题，但不要为了显得完整而增加新的角色、流程、原因、边界、建议或待确认项。
+- 对有原文定位的编辑问题，合并重复信息、调整论证顺序或修复措辞；不要因偏好建议删掉必要条件。事实已经通过时，仍须检查编辑后是否改变原意。
 - 保留初稿中已有来源支持且与用户请求相关的内容。
 - 无法由来源支持的表述应删除、收窄或明确为来源中的未知；不要与评审争辩。
 - 只输出可直接使用的完整成稿，不要解释修改过程、提及评测或附加后续服务话术。
@@ -768,16 +800,31 @@ def revision_prompt(
 """
 
 
-def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
+def judge_prompt(case: dict[str, Any], source: str, candidate: str,
+                 editorial_findings: list[dict[str, Any]] | None = None) -> str:
     contract = json.dumps(case["expected"], ensure_ascii=False, indent=2)
     semantic_contract = json.dumps(
         case.get("semantic_contract", {}), ensure_ascii=False, indent=2
     )
     limits = json.dumps(case.get("limits", {}), ensure_ascii=False, indent=2)
+    advisory = ""
+    if editorial_findings is not None:
+        advisory = (
+            "\n【独立编辑提出的候选问题，不是已确认结论】\n"
+            + json.dumps(editorial_findings, ensure_ascii=False, indent=2)
+            + "\n根据原始材料、用户任务和候选稿独立核实这些意见，不机械采纳。"
+              "仅把确有依据的问题纳入最终 editorial；可拒绝偏好、误报或会删除必要条件的建议，"
+              "本阶段只确认或驳回已列出的编辑问题，不新增 editorial 问题；"
+              "确认时保留该候选问题的 kind 和 quote 原文，reason 和 suggestion 可按来源纠正。"
+              "候选为空时 editorial.issues 必须为空。"
+              "新的事实错误仍须通过 must、must_not 或 blocking_issues 报告，不能因编辑候选为空而放行。"
+              "不要把候选问题的数量当成必须确认的数量。\n"
+        )
     return f"""你是一个独立的文档行为验收员。你没有参与候选稿的生成，只能根据本消息中的请求、原始材料、候选稿和验收合同判分。不要重写候选稿。
 
 判分规则：
 - must 项只有在候选稿明确满足且没有越过原始材料证据边界时才为 PASS。
+- 原始材料是语义依据；如果验收合同或账本与原文冲突，记录为阻断问题，不按错误账本放行。特别区分“不要求”和“禁止”、“可选”和“不采集”，不能把非必填改成禁用。
 - must 和 must_not 都按验收合同原有顺序用从 1 开始的 criterion_index 标识；不要复制或改写验收项文字。
 - must_not 项不填写 PASS/FAIL，而是判断禁用行为是否出现：没有出现填 ABSENT，出现填 PRESENT，无法判断才填 UNCERTAIN。
 - 工具不接收顶层 status；程序会把 must 的 status、must_not 的 presence 和 blocking_issues 归一化为最终 PASS/FAIL/UNCERTAIN。
@@ -791,6 +838,13 @@ def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
 - 原始材料提供 source_id、text_sha256 和行号时，evidence 应使用这些真实定位；不得编造来源或行号。定位有效不等于语义推断自动正确。
 - must 中每一个 status 字段的值必须精确等于 PASS、FAIL 或 UNCERTAIN 三者之一；must_not 中每一个 presence 字段必须精确等于 ABSENT、PRESENT 或 UNCERTAIN 三者之一。禁止添加解释、空格或其他文字；所有解释只能写进 evidence。
 - blocking_issues 只记录足以阻止通过的问题；只要该数组非空，程序计算的最终 status 就是 FAIL。
+- 无论合同是否列出文风要求，都填写 editorial：逐篇检查结构、段落信息贡献、句子关系、措辞、呈现及无关写作说明。每项问题给出候选稿中连续且原样的 quote、具体 reason 和不改变事实的 suggestion；不要重写全文，没有发现则 issues 为空。不要为凑数量报告偏好。专用术语重现、独立摘要、增加了实际检查的边界重申不自动算重复；短进展的标题与条目、正文与范围表重复整套流程且没有独立阅读需要时，要记录新增信息不足。来源说未提供旧流程，不代表解释新方案时必须写出这项缺失。
+- 结构检查要区分“中心回答是否出现”和“理由是否支持回答”。检查上层判断与下层依据、同层分组是否一致、顺序是否有因果/时间/组成/重要性依据；标题数量和结论前置本身不能证明结构良好。状态汇报不必有推荐或理由树。理由、行动和结果混列，或列出各选项共有能力却未解释选择差异时，定位实际结构问题。缺少来源依据时不能要求补造论证。
+- 语义分组与视觉分块不同。自然段中通过明确的因果、时序和目标关系已经区分信息作用时，不因没有分段、小标题、表格或编号而判结构失败。除非用户明确规定排版形式，否则应检查信息之间的逻辑关系，而非强制各类信息独占一块；相反，已有标题也不能掩盖实际混类。
+- 编辑检查须跨段比较，尤其检查开头与结尾、场景与流程、正文与表格。报告重复时，在 reason 中同时指出另一处对应表述及两处为何没有不同用途；不能只凭同一个词多次出现判重复。重组任务还须检查决定性依据的位置：若先展开大量细节再解释为何选择该方案，定位这个次序问题；沿用原稿顺序不是正确性的证明，但也不能仅因顺序未变就判错。
+- 结论、建议或请求决定可以先于详细论据出现，这是正常的结论先行；不要要求读者必须先看完所有依据才看到请求。顺序问题指决定性理由被无关紧要的细节隔开，不是成本、分工等全部信息都必须挤到首句。quote 应复制候选稿的一小段连续原文，不拼接句段、不补标点、不改写。
+- editorial 是独立的编辑观察，不自动改变原有合同 status；若同一问题违反明确合同，还须将对应合同项判 FAIL/PRESENT，不能只记为编辑建议。反之，普通编辑问题不要伪装成事实错误。NO_ISSUES_FOUND 只表示本次未发现，不能证明可直接发送或真人已读懂。
+- 诊断前明确句子所说的对象与关系，不把不同种类的比较、能力或证据混为一谈。判断缺失说明是否多余，要看它是否服务用户当前任务；真实但无关的缺失说明属于相关性问题，不凭空改判成无依据因果。反过来，用户要求的比较因材料缺失无法完成时，应保留这个限制。
 - 本用例的 must 数组必须恰好有 {len(case['expected']['must'])} 项，criterion_index 依次为 {list(range(1, len(case['expected']['must']) + 1))}；must_not 数组必须恰好有 {len(case['expected']['must_not'])} 项，criterion_index 依次为 {list(range(1, len(case['expected']['must_not']) + 1))}。不得增删、合并或重复检查项。
 - 最终必须且只能调用 `{FACT_JUDGMENT_TOOL}` 一次；把判定填入工具参数。不要改用正文、JSON 文本或 Markdown 代码块作答。
 
@@ -800,7 +854,8 @@ def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
   "case_id": "{case['id']}",
   "must": [{{"criterion_index": 1, "status": "PASS | FAIL | UNCERTAIN", "evidence": "候选稿依据或缺失说明"}}],
   "must_not": [{{"criterion_index": 1, "presence": "ABSENT | PRESENT | UNCERTAIN", "evidence": "未出现或出现的依据"}}],
-  "blocking_issues": ["阻止通过的问题；没有则为空数组"]
+  "blocking_issues": ["阻止通过的问题；没有则为空数组"],
+  "editorial": {{"schema": "write-craft.editorial.v1", "issues": [{{"kind": "redundancy | irrelevant_commentary | structure | sentence | wording | presentation", "quote": "候选稿原文", "reason": "具体问题及影响", "suggestion": "编辑方向"}}]}}
 }}
 
 【用户请求】
@@ -820,6 +875,7 @@ def judge_prompt(case: dict[str, Any], source: str, candidate: str) -> str:
 
 【确定性长度限制】
 {limits}
+{advisory}
 """
 
 
@@ -1062,6 +1118,54 @@ def safe_message_metadata(message: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def skill_read_trace(jsonl: str) -> dict[str, Any]:
+    """Retain read receipts, not contents or reasoning; success is not compliance."""
+    reads: list[dict[str, Any]] = []
+    pending: dict[str, dict[str, Any]] = {}
+    malformed = 0
+    for line in jsonl.splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            malformed += 1
+            continue
+        if not isinstance(event, dict):
+            continue
+        call_id = event.get("toolCallId")
+        if not isinstance(call_id, str):
+            continue
+        if event.get("type") == "tool_execution_start" and event.get("toolName") == "read":
+            args = event.get("args")
+            args = args if isinstance(args, dict) else {}
+            raw_path = args.get("path", args.get("file_path"))
+            path = "OUTSIDE_SKILL_OR_UNKNOWN"
+            if isinstance(raw_path, str):
+                try:
+                    candidate = Path(raw_path).expanduser()
+                    if not candidate.is_absolute():
+                        candidate = ROOT / candidate
+                    path = str(candidate.resolve().relative_to(SKILL_ROOT.resolve()))
+                except (ValueError, OSError, RuntimeError):
+                    pass
+            item: dict[str, Any] = {"path": path, "status": "UNCONFIRMED"}
+            for key in ("offset", "limit"):
+                value = args.get(key)
+                if type(value) is int and value > 0:
+                    item[key] = value
+            reads.append(item)
+            pending[call_id] = item
+        elif event.get("type") == "tool_execution_end" and call_id in pending:
+            item = pending.pop(call_id)
+            if event.get("isError") is False:
+                item["status"] = "SUCCEEDED"
+            elif event.get("isError") is True:
+                item["status"] = "FAILED"
+    return {"reads": reads, "malformed_lines": malformed,
+            "evidence_limit": "Read completion does not prove full content visibility or rule compliance."}
+
+
 def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -1138,11 +1242,25 @@ def run_fact_review(
     output_dir: Path,
     keep_raw_jsonl: bool = False,
     raw_jsonl_max_bytes: int = DEFAULT_RAW_JSONL_MAX_BYTES,
+    focused_editorial: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    focused = None
+    if focused_editorial:
+        focused = run_editorial_review(
+            case=case, candidate=candidate, model=model, thinking=thinking,
+            timeout=timeout, output_dir=output_dir / "editorial",
+            keep_raw_jsonl=keep_raw_jsonl, raw_jsonl_max_bytes=raw_jsonl_max_bytes,
+        )
+        if focused["status"] == "ERROR":
+            return {"status": "ERROR", "error": focused["error"],
+                    "review": {"model": model, "thinking": thinking,
+                               "focused_editorial": focused["review"],
+                               "usage_summary": focused["review"]["usage_summary"]}}
     judged = run_command(
         pi_args(
-            prompt=judge_prompt(case, source, candidate),
+            prompt=judge_prompt(case, source, candidate,
+                                focused["editorial"]["issues"] if focused else None),
             model=model,
             thinking=thinking,
             with_skill=False,
@@ -1171,6 +1289,11 @@ def run_fact_review(
         "usage_summary": assistant_usage_summary(judged["stdout"]),
         "raw_log": raw_log,
     }
+    if focused:
+        review["focused_editorial"] = focused["review"]
+        review["usage_summary"] = merge_usage_summaries(
+            review["usage_summary"], focused["review"]["usage_summary"]
+        )
     result: dict[str, Any] = {"status": "ERROR", "review": review}
     if judged["timed_out"]:
         result["error"] = "judge timed out"
@@ -1182,12 +1305,27 @@ def run_fact_review(
         judge_final = extract_final_tool_call(judged["stdout"], FACT_JUDGMENT_TOOL)
         judgment = parse_judgment(
             json.dumps(
-                normalize_fact_tool_arguments(judge_final["arguments"], case),
+                normalize_fact_tool_arguments(judge_final["arguments"], case, require_editorial=True),
                 ensure_ascii=False,
             ),
             case,
         )
         judgment = apply_deterministic_checks(judgment, case, candidate)
+        judgment["editorial"] = validate_editorial(judgment["editorial"], candidate)
+        if focused is not None:
+            proposed = {
+                (issue["kind"], issue["quote"])
+                for issue in focused["editorial"]["issues"]
+            }
+            if any(
+                (issue["kind"], issue["quote"]) not in proposed
+                for issue in judgment["editorial"]["issues"]
+            ):
+                # Reject the review contract, rather than silently dropping a
+                # finding or letting a new preference consume a revision.
+                raise ContractError(
+                    "source adjudication introduced an unproposed editorial issue"
+                )
     except ContractError as exc:
         result["error"] = str(exc)
         return result
@@ -1202,6 +1340,56 @@ def run_fact_review(
             "blocking_issues": judgment["blocking_issues"],
         }
     )
+    return result
+
+
+def run_editorial_review(
+    *, case: dict[str, Any], candidate: str, model: str, thinking: str,
+    timeout: int, output_dir: Path,
+    keep_raw_jsonl: bool = False,
+    raw_jsonl_max_bytes: int = DEFAULT_RAW_JSONL_MAX_BYTES,
+) -> dict[str, Any]:
+    """Read the prose in a fresh context without the source-contract checklist."""
+    prompt = f"""你是独立中文编辑，只检查成稿的结构、信息贡献和语言，不核验项目事实、不提出新方案、不重写全文。
+逐段检查新增信息，比较开头与后文、场景与流程/表格、标题与段落是否同义重述；检查决定性理由是否被实现细节隔开。
+结论、建议或决定请求可以先于详细论据，不要要求读完所有依据再看到请求；没有标题或表格本身不是缺陷。
+重复问题在 reason 中同时指出另一处对应原句及两处为何没有不同用途。独立阅读的摘要、新增验收动作或不同适用条件的重申可以保留；场景中的执行人或复核节点不因验收表提到相同条件就应被删除。不要为偏好凑问题。
+按信息作用判断删除：提案意图不等于实际实施状态，前提不等于它的行动含义，执行说明不等于验收检查；删去其中一处会失去这些区别时，不是冗余。只报告能够定位实际理解或判断障碍的问题，正常可懂的句式不因另有写法就需要修改，不以猜测读者会误读作为证据。没有原始来源，不建议补造新的因果或职责关系。
+不同作用的信息可以在同一段里，通过清楚的因果、条件或时序关系区分即可。不要求每一种信息另起段落，也不因缺少分类标签就判定逻辑混乱；必须指出实际不成立或不清楚的关系。
+quote 复制候选稿的一小段连续原文，不补标点、不改写、不拼接。没有发现问题则 issues 为空。
+只输出 JSON：{{"schema":"write-craft.editorial.v1","issues":[{{"kind":"redundancy|irrelevant_commentary|structure|sentence|wording|presentation","quote":"原文","reason":"具体问题","suggestion":"不改变原意的编辑方向"}}]}}。
+
+【用户请求】
+{case['request']}
+
+【候选稿】
+{candidate}
+"""
+    output_dir.mkdir(parents=True, exist_ok=False)
+    write_json(output_dir / "input.json", {
+        "case_id": case["id"], "candidate_sha256": sha256_text(candidate),
+        "prompt_sha256": sha256_text(prompt),
+    })
+    response = run_command(pi_args(prompt=prompt, model=model, thinking=thinking,
+                                  with_skill=False), timeout)
+    review = {key: response[key] for key in ("returncode", "duration_seconds", "timed_out")}
+    review.update({"model": model, "thinking": thinking,
+                   "usage_summary": assistant_usage_summary(response["stdout"]),
+                   "raw_log": persist_raw_jsonl(output_dir / "editorial.jsonl", response["stdout"],
+                                                enabled=keep_raw_jsonl, max_bytes=raw_jsonl_max_bytes)})
+    result: dict[str, Any] = {"status": "ERROR", "review": review}
+    try:
+        if response["timed_out"] or response["returncode"] != 0:
+            raise ContractError("focused editorial review did not complete")
+        final = extract_final_assistant(response["stdout"])
+        review["message"] = safe_message_metadata(final["message"])
+        payload = json.loads(strip_json_fence(final["text"]))
+        write_json(output_dir / "unvalidated.json", payload)
+        result["editorial"] = validate_editorial(payload, candidate)
+        result["status"] = result["editorial"]["status"]
+    except (ContractError, json.JSONDecodeError) as exc:
+        result["error"] = str(exc)
+    write_json(output_dir / "result.json", result)
     return result
 
 
@@ -1241,6 +1429,7 @@ def evaluate_case(
     timeout: int,
     keep_raw_jsonl: bool = False,
     raw_jsonl_max_bytes: int = DEFAULT_RAW_JSONL_MAX_BYTES,
+    focused_editorial: bool = False,
 ) -> dict[str, Any]:
     sources = case_sources(case)
     source = format_sources(sources, legacy_plain="sources" not in case)
@@ -1287,9 +1476,11 @@ def evaluate_case(
             "timed_out": generated["timed_out"],
             "usage_summary": assistant_usage_summary(generated["stdout"]),
             "raw_log": generator_raw_log,
+            "skill_read_trace": skill_read_trace(generated["stdout"]),
         },
         "judge": {"model": judge_model, "thinking": judge_thinking},
         "revision_policy": {"max_revisions": max_revisions},
+        "focused_editorial": focused_editorial,
         "revisions_used": 0,
         "stages": {
             "generation": "ERROR",
@@ -1339,6 +1530,7 @@ def evaluate_case(
         thinking=judge_thinking,
         timeout=timeout,
         output_dir=initial_dir,
+        focused_editorial=focused_editorial,
         keep_raw_jsonl=keep_raw_jsonl,
         raw_jsonl_max_bytes=raw_jsonl_max_bytes,
     )
@@ -1363,9 +1555,13 @@ def evaluate_case(
             "status": judgment["status"],
             "blocking_issues": judgment["blocking_issues"],
             "judge": fact_review["review"],
+            "editorial": judgment["editorial"],
         }
 
-    if judgment["status"] != "PASS" and max_revisions == 1:
+    if max_revisions == 1 and (
+        judgment["status"] != "PASS"
+        or judgment["editorial"]["status"] == "NEEDS_EDIT"
+    ):
         revision_dir = case_dir / "revision-1"
         revision_dir.mkdir()
         revised = run_command(
@@ -1394,6 +1590,7 @@ def evaluate_case(
             "timed_out": revised["timed_out"],
             "usage_summary": assistant_usage_summary(revised["stdout"]),
             "raw_log": revision_raw_log,
+            "skill_read_trace": skill_read_trace(revised["stdout"]),
         }
         result["usage_summary"] = merge_usage_summaries(
             result["usage_summary"], result["revision"]["usage_summary"]
@@ -1443,6 +1640,7 @@ def evaluate_case(
             thinking=judge_thinking,
             timeout=timeout,
             output_dir=revision_dir,
+            focused_editorial=focused_editorial,
             keep_raw_jsonl=keep_raw_jsonl,
             raw_jsonl_max_bytes=raw_jsonl_max_bytes,
         )
@@ -1460,6 +1658,7 @@ def evaluate_case(
 
     write_json(case_dir / "judgment.json", judgment)
     result["judgment_sha256"] = fact_review["judgment_sha256"]
+    result["editorial"] = judgment["editorial"]
     result["status"] = judgment["status"]
     result["blocking_issues"] = judgment["blocking_issues"]
     result["stages"]["fact_review"] = judgment["status"]
@@ -1670,12 +1869,13 @@ def calibrate_judge(
                 judgment = parse_judgment(
                     json.dumps(
                         normalize_fact_tool_arguments(
-                            judge_final["arguments"], fixture["case"]
+                            judge_final["arguments"], fixture["case"], require_editorial=True
                         ),
                         ensure_ascii=False,
                     ),
                     fixture["case"],
                 )
+                judgment["editorial"] = validate_editorial(judgment["editorial"], fixture["candidate"])
             except ContractError as exc:
                 result["error"] = str(exc)
             else:
@@ -1684,15 +1884,21 @@ def calibrate_judge(
                     judge_final["message"]
                 )
                 result["judge_status"] = judgment["status"]
+                result["editorial"] = judgment["editorial"]
                 result["judgment_sha256"] = sha256_text(canonical_json(judgment))
                 result["status"] = (
                     "PASS"
                     if judgment["status"] == fixture["expected_status"]
                     else "FAIL"
                 )
+                if (fixture.get("expected_editorial_status") is not None
+                        and judgment["editorial"]["status"] != fixture["expected_editorial_status"]):
+                    result["status"] = "FAIL"
                 if result["status"] == "FAIL":
                     result["error"] = (
-                        f"expected {fixture['expected_status']}, got {judgment['status']}"
+                        f"expected contract={fixture['expected_status']}, got {judgment['status']}; "
+                        f"expected editorial={fixture.get('expected_editorial_status')}, "
+                        f"got {judgment['editorial']['status']}"
                     )
         write_json(fixture_dir / "result.json", result)
         results.append(result)
@@ -1841,12 +2047,13 @@ def rejudge_case(
             )
             judgment = parse_judgment(
                 json.dumps(
-                    normalize_fact_tool_arguments(judge_final["arguments"], case),
+                    normalize_fact_tool_arguments(judge_final["arguments"], case, require_editorial=True),
                     ensure_ascii=False,
                 ),
                 case,
             )
             judgment = apply_deterministic_checks(judgment, case, candidate)
+            judgment["editorial"] = validate_editorial(judgment["editorial"], candidate)
         except ContractError as exc:
             result["error"] = str(exc)
         else:
@@ -1854,6 +2061,7 @@ def rejudge_case(
             result["judge"]["message"] = safe_message_metadata(judge_final["message"])
             result["judgment_sha256"] = sha256_text(canonical_json(judgment))
             result["status"] = judgment["status"]
+            result["editorial"] = judgment["editorial"]
             result["blocking_issues"] = judgment["blocking_issues"]
     write_json(output_dir / "result.json", result)
     result["output"] = str(output_dir)
@@ -1862,11 +2070,11 @@ def rejudge_case(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", help="Pi generator model, e.g. deepseek/deepseek-flash")
+    parser.add_argument("--model", help="Pi generator model, e.g. deepseek/deepseek-v4-flash")
     parser.add_argument(
         "--judge-model",
         required=True,
-        help="Pi judge model, e.g. deepseek/deepseek-flash",
+        help="Pi judge model, e.g. deepseek/deepseek-v4-flash",
     )
     parser.add_argument(
         "--reader-model",
@@ -1885,6 +2093,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reader-thinking", default="medium")
     parser.add_argument("--reader-judge-thinking", default="high")
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--focused-editorial", action="store_true",
+                        help="also review prose in a separate context; share the existing revision budget")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument(
         "--keep-raw-jsonl",
@@ -1930,6 +2140,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.rejudge and args.calibrate_judge:
         print("ERROR: --rejudge and --calibrate-judge are mutually exclusive", file=sys.stderr)
+        return 2
+    if args.focused_editorial and (args.rejudge or args.calibrate_judge):
+        print("ERROR: --focused-editorial requires a generation run", file=sys.stderr)
+        return 2
+    if args.calibrate_judge and args.case_ids:
+        print("ERROR: --case selects generation cases, not judge calibration fixtures", file=sys.stderr)
         return 2
     if args.rejudge:
         try:
@@ -2024,9 +2240,11 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
                 keep_raw_jsonl=args.keep_raw_jsonl,
                 raw_jsonl_max_bytes=args.raw_jsonl_max_bytes,
+                focused_editorial=args.focused_editorial,
             )
             results.append(result)
-            print(f"  {result['status']}", file=sys.stderr, flush=True)
+            editorial_state = result.get("editorial", {}).get("status", "NOT_EVALUATED")
+            print(f"  {result['status']} / editorial={editorial_state}", file=sys.stderr, flush=True)
             if result["status"] == "ERROR":
                 aborted = True
                 break
@@ -2067,12 +2285,20 @@ def main(argv: list[str] | None = None) -> int:
             ]
         ),
         "aborted_after_system_error": aborted,
+        "focused_editorial": args.focused_editorial,
+        "editorial_status": (
+            "NOT_EVALUATED" if aborted or any("editorial" not in item for item in results)
+            else "NEEDS_EDIT" if any(item["editorial"]["status"] == "NEEDS_EDIT" for item in results)
+            else "NO_ISSUES_FOUND"
+        ),
         "status": aggregate_status([item["status"] for item in results]),
         "results": results,
     }
     write_json(output_root / "run.json", summary)
     print(json.dumps({"status": summary["status"], "output": str(output_root)}, ensure_ascii=False))
-    return 0 if summary["status"] == "PASS" else 1
+    return 0 if (summary["status"] == "PASS" and (
+        not args.focused_editorial or summary["editorial_status"] == "NO_ISSUES_FOUND"
+    )) else 1
 
 
 if __name__ == "__main__":

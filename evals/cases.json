@@ -615,6 +615,52 @@
           "补造工期、投入、预算或最终达标门槛"
         ]
       }
+    },
+    {
+      "id": "pyramid-unsupported-parent",
+      "suite": "full",
+      "track": "regression",
+      "tags": [
+        "rewrite",
+        "structure",
+        "evidence"
+      ],
+      "max_revisions": 1,
+      "request": "把材料写成给负责人的选择建议，说明选择依据，不要把共有能力当成选择理由。",
+      "source": "建议选甲。甲两周交付，乙六周交付；要求三周内交付。甲乙都支持导出报表，也都支持按月份查询。",
+      "expected": {
+        "must": [
+          "保留建议、交付时间、三周要求与共有能力",
+          "理由支持所建议的选择"
+        ],
+        "must_not": [
+          "把共有能力当成选甲的区别性理由",
+          "编造成本或其他差异"
+        ]
+      }
+    },
+    {
+      "id": "pyramid-mixed-peers",
+      "suite": "full",
+      "track": "regression",
+      "tags": [
+        "rewrite",
+        "structure",
+        "evidence"
+      ],
+      "max_revisions": 1,
+      "request": "整理成一份简明方案说明，区分选择理由、执行步骤和目标。",
+      "source": "建议沿用现有表格，理由是成员都已有访问权限，不必重新开通。执行时先整理字段，再由组长试填。目标是减少汇总时间，尚未计时。",
+      "expected": {
+        "must": [
+          "保留建议、理由、步骤和未验证目标",
+          "分组应区分理由、步骤和目标"
+        ],
+        "must_not": [
+          "把执行步骤和目标都列为选择理由",
+          "将目标写成已有效果"
+        ]
+      }
     }
   ]
 }

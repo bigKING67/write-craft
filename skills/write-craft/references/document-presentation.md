@@ -52,12 +52,9 @@ Treat emphasis as a limited resource:
   for every section.
 - Bold a short label or the few words that carry the decision. Do not bold whole
   paragraphs or repeat the same conclusion in several visual forms.
-- Before delivery, compare adjacent sentences and paragraphs by meaning, not
-  wording. If the later one adds no fact, condition, reason, action, or useful
-  contrast, merge or delete it. For example, `不能证明质量或产能` followed by
-  `不能作为质量或产能的依据` repeats one evidence boundary. Keep it once;
-  retain repetition that adds an actual acceptance check or makes a separately
-  usable summary complete.
+- Apply the editorial pass in `clear-chinese.md` across visual forms too: a
+  callout, heading, and table should not each retell the same paragraph without
+  a useful navigation, comparison, or independent-reading role.
 - Prefer the platform's default typeface, body size, spacing, and native
   heading styles. Mixed fonts and manual size changes usually weaken
   consistency and portability.

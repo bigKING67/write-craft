@@ -13,6 +13,13 @@ without any upstream checkout.
 | Composio `content-research-writer` | Research-assisted articles and section feedback | Reference only; outside current scope | Not in the current trigger surface |
 | Arjun `plain-language` | Explain technical material without deleting precision or uncertainty | Selectively absorbed under MIT | `decision-documents.md`, `clear-chinese.md` |
 | Pi Skill documentation | Progressive Skill loading and package integration boundaries | Packaging and validation guidance only | Repository tooling; no runtime dependency |
+| lijigang `ljg-writes` and selected `ljg-paper` guidance | Separate content review from Chinese editing; paragraph contribution, continuity, and reader-facing explanation | Independently expressed methods; behavior improvement not yet established | `SKILL.md`, `clear-chinese.md`, revised examples in `decision-documents.md` |
+
+The pyramid-building method independently applies the grouping-to-insight
+principle described at https://www.barbaraminto.com/concept (reviewed 2026-09-26).
+No book text or course materials are reproduced; this is not a claim of having
+read the complete book. Local application: `decision-documents.md` and the
+entrypoint compose/group/edit workflow. Writing quality requires evaluation.
 
 The project also consulted public Microsoft guidance on scannable content and
 Google developer-documentation accessibility guidance. Public method guidance
@@ -20,6 +27,9 @@ in this table is not vendored and is not a runtime dependency.
 
 See the repository-level `upstreams.lock.json`, `THIRD_PARTY_NOTICES.md`, and
 `docs/upstream-absorption.md` for exact revisions and license handling.
+The non-vendored ljg-skills review is pinned in `docs/upstream-absorption.md` at
+`fdea0bea5133246de418d19015f65eeb18699623` (MIT); `ljg-plain` was reviewed only
+as a supplementary reference, not adopted as a style or output contract.
 
 ## Reviewed candidates not admitted as upstreams
 

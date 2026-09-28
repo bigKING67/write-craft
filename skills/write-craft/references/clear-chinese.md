@@ -20,6 +20,59 @@ Before polishing sentences, write one private core sentence: “这是什么／�
 When evidence does not support a conclusion, the core can be a question,
 boundary, or progress statement instead of a confident claim.
 
+## Delete by meaning, not by word count
+
+For each paragraph, privately name the fact, reason, distinction, condition or
+next action it adds to the reader's answer. Apply the test across the whole
+answer, including headings, prose, lists and tables. If a contribution is
+already complete elsewhere, edit the smallest passage that repeats it; keep
+unique information in the same paragraph. Before deleting, locate where every
+necessary fact, condition and uncertainty will remain. A claim that it is
+“covered elsewhere” is not enough; check the actual retained wording.
+
+Choose which occurrence to keep by its job in the argument. Preserve the early
+core answer and decisive reason; deleting them because details recur later
+makes the reader reconstruct the conclusion. Do not delete a separately usable
+summary or a condition that qualifies a different claim. Prefer a local edit
+to regenerating an otherwise sound draft. After deletion or movement, reread
+for broken references, detached qualifications and headings without content.
+If no edit improves the reading without loss, leave the passage unchanged.
+
+A heading should not consume a sentence merely announcing its own subject. For
+example, after “主要风险是供应商停止维护”, start the paragraph with the supplied
+consequence or mitigation rather than “供应商停止维护是本方案的主要风险”.
+If neither is supplied or needed, the heading itself can be a sentence in the
+surrounding paragraph; an empty section is unnecessary.
+
+Keep the reasoning that earns the conclusion. A shorter draft that drops why
+an option fits the stated priorities, or hides its limiting condition, is worse.
+Do not set a compression percentage, shorten every sentence, or count repeated
+terms as repeated meaning. End after the last useful piece of information;
+a second summary is not mandatory.
+
+### Example: merge repeated scope and status into their useful location
+
+This is synthetic material, not a prescribed outline or length.
+
+**Repetitive draft**
+
+> 拟用一张交接卡记录当天未办完的借用事项，先在前台试用；尚未试用，印制费用未询价。
+>
+> 交班人填写物品、存放位置和下一步动作，接班人处理后填写日期。只覆盖借用事项，不包含采购。
+>
+> 本期范围仅为借用事项，采购不在范围内。试用尚未开始，印制费用仍未询价。
+
+**Edited draft**
+
+> 拟在前台试用交接卡，记录当天未办完的借用事项，不包含采购。交班人填写物品、存放位置和下一步动作，接班人处理后填写日期。
+>
+> 方案尚未试用，印制费用未询价。
+
+The edit moves the scope beside the proposed activity and keeps the two unknowns
+once. It preserves who does what and when; it adds no reason, benefit or approval
+gate. A separate acceptance check about procurement would serve a different
+purpose and should not be deleted merely for mentioning the same boundary.
+
 ## Put actors and actions back into the sentence
 
 Prefer “运营人员提交需求，剪辑人员审核初稿” to “实现需求提交与初稿审核闭环”.
@@ -106,3 +159,70 @@ When examples of the author's writing exist, preserve their level of warmth,
 directness, and formality. Correct ambiguity and stiffness without turning every
 document into ceremonial corporate prose. Read the final draft aloud; revise
 places that require backtracking or sound unlike something a person would say.
+
+## Finish the editorial pass
+
+Read the complete draft in order, not just the sentences changed last. For a
+short update this can be a brief self-check, not a separate workflow or output.
+
+- **Structure:** can the reader follow the explanation using the supplied
+  information? Put prerequisites before what depends on them. Parallel sections
+  may remain parallel; do not invent a causal bridge to make them flow.
+- **Paragraph contribution:** identify what each paragraph adds. Merge or cut
+  a restatement that adds no fact, condition, reason, action, or useful contrast.
+  Apply this across headings, summaries, prose, lists, and tables. Preserve a
+  summary with an actual independent reading purpose and repeated boundaries
+  that add acceptance checks;
+  repeating a precise term is not itself redundant meaning.
+- **Sentences:** check who acts, what the action applies to, what pronouns refer
+  to, and how conditions qualify the claim. Repair missing relationships from
+  supported material. Do not force short sentences or remove useful connectives.
+- **Wording:** check accurate meaning, natural collocations, and consistent
+  terminology and tone. If synonym substitution leaves an awkward sentence,
+  reconstruct it around its intended meaning. Keep already natural wording.
+- **Presentation and ending:** headings should help navigation, tables should
+  expose a comparison, and emphasis should identify something important. Remove
+  low-value containers and repeated closing summaries, not necessary conditions.
+
+Keep editing commentary out of clean copy. For example, `不能把节省时间写成
+已经验证的效果` tells the writer what to do; a reader-facing version is
+`实际节省时间尚未验证`. Relevant uncertainty belongs in the document; a defense
+of the writer's choices does not. End when the reader's task is served.
+
+Choose gaps by the reader's task, not simply because the source mentions them.
+With the same source stating that the old process is unspecified, an explanation
+of the proposed process can omit that absence; a requested old/new comparison
+must disclose that the old side cannot be reconstructed from the material.
+Neither version may invent the old process. A comparison of steps and a
+measurement of elapsed time are distinct questions; preserve that distinction.
+
+After editing, recheck facts, conditions, authority, and the total length. Do not
+trade meaning for smoothness or describe self-editing as an independent test.
+
+## Language and precision
+
+Prefer explicit actors, actions, conditions, and results. Give each paragraph
+one job. Replace a technical term when a plain equivalent is accurate; explain
+it once when the reader needs the term again; cut it when it serves only the
+author. Keep exact numbers, conditions, uncertainty, and the distinction between
+`不能` and `尚未`.
+
+A plain-language rewrite must unpack a scope-bearing term, not just move it
+into a shorter sentence. For example, explain `已缓存查询` as `能够直接从缓存中
+读取结果的查询`, while keeping the sample boundary and the untested write and
+cache-miss cases visible.
+
+Do not use abstract words such as “赋能”“闭环”“智能化”“全面提升” as substitutes
+for a mechanism, owner, result, or test. Do not infantilize a non-technical
+reader or remove precision merely to shorten the document.
+
+## Final reader check
+
+Before delivery, confirm that a reader can identify:
+
+- what problem or opportunity matters;
+- what is recommended and why;
+- what is in and out of scope;
+- what evidence is known and what remains unverified;
+- what resources, risks, and trade-offs matter;
+- what, if anything, they must decide or do next.

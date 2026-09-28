@@ -44,19 +44,59 @@ Do not skip directly from a mechanism to revenue, efficiency, quality, or
 adoption unless evidence establishes that link, and do not fill an absent link
 with a conventional process.
 
+## Build a pyramid of findings
+
+Work from the evidence upward; present from the answer downward. Start with the
+question this reader needs answered, group relevant facts, and express the
+finding each group supports. A finding must add a supported meaning, not just
+name the group: “两方案都能按期交付，差别在费用与后续维护” says more than
+“方案分析”. Do not derive that finding unless the source supports both parts.
+
+Test the relationships before drafting:
+
+- **Vertical support:** if the parent says “建议选甲”, its children must explain
+  why that choice fits the stated criteria. Listing what 甲 contains is not
+  enough. Evidence belongs under the reason it supports. If a premise is missing,
+  narrow the judgment or expose the consequential uncertainty; do not supply it.
+- **Horizontal grouping:** peers answer the same question at the same level.
+  Reasons for choosing, implementation steps and expected results have different
+  jobs; do not mix them as three “advantages”. Compare alternatives against the
+  same relevant criteria, preserving an unknown cell rather than guessing it.
+- **Order:** arrange dependencies before dependent actions, steps by time, parts
+  by their relationship, or reasons by decision importance. A list without a
+  defensible order may need regrouping. Independent reasons need no invented
+  causal bridge. Do not force a fixed number of groups or completeness beyond
+  what this task and the sources support.
+
+Use the reader's situation and the change or difficulty only to establish the
+question when it is not already obvious. Do not prepend a background story to a
+short update. The answer can be a current state or a conditional conclusion;
+writing about a project does not itself authorize recommending another project.
+
+After drafting, read only the opening and the section claims: do they form a
+coherent answer? Then read the support under each claim: does it explain or
+substantiate the claim, or merely repeat it? Revise the grouping before wording.
+This checks the argument, not the number or style of headings.
+
 ## Design the first reading layer
 
-A reader should be able to find the source-supported items relevant to this
-task near the beginning. These often include:
+Open with the answer this reader needs, including the condition without which
+it would be misleading. Choose the relevant problem, recommendation or current
+state, decisive reason, limitation and requested action from the source. These
+are selection criteria, not five compulsory sentences or a miniature copy of
+the whole body. Put each supporting detail where it serves the argument once.
 
-1. the current problem or opportunity;
-2. the recommendation or current conclusion;
-3. why this option is preferred now;
-4. the most important limitation or uncertainty;
-5. the decision or next action, if one exists.
+A short update can be one paragraph or a small list of completed work, remaining
+work and relevant dependency. A proposal explanation can state the supported
+use and then its constraints. A comparison can use one common-criteria table and
+a decision paragraph that interprets it. Choose by the task; no format or
+paragraph count is mandatory. If the form already answers the question, stop.
 
-Write the summary after the body is sound, even though it appears first. A
-summary is not a teaser: it should contain the conclusion.
+Use a separate summary when requested or when it has a real independent reading
+purpose, such as a decision entry paired with a full engineering source. Write
+it after the body is sound and include the conclusion. Do not add a summary to
+a short report merely to satisfy “conclusion first”. A heading and its paragraph
+should contribute different information, just as prose and a table should.
 
 ## Separate the decision entry from the engineering source when needed
 
@@ -77,6 +117,15 @@ after delivery, put an explicit pointer inside the short entry itself. Name the
 included file, attachment, or exact section, for example `完整工程方案见文件二`.
 Showing the engineering source later in the same response is not enough: the
 short entry must retain the path when copied or sent on its own.
+
+Use the reader's present task to choose detail, not the source's section count.
+When the task is to confirm a first-stage scope and inputs, explain the complete
+goal but develop the first stage. Category examples, historical tables and
+later-stage mechanics may remain in the linked detailed source when they do not
+change that decision. Do not reproduce every category list and illustrative
+case merely to prove that the source was read. This does not authorize deleting
+material the user explicitly asks to preserve in full, narrowing the approved
+plan, or hiding a condition that affects the current choice.
 
 Do not use the split to hide a constraint. Any fact that changes feasibility,
 cost, timing, risk, acceptance, or the requested authorization must still
@@ -153,7 +202,17 @@ Useful candidates include:
 
 Use consistent criteria when comparing options. Do not praise one option for
 speed and reject another for cost without showing both criteria for both
-options.
+options. Follow the reader's supplied priority order. If the primary criterion
+has no comparable evidence, say what cannot be ranked; do not manufacture a
+winner from a cheaper price, a different population, an analogy or an adjacent
+metric. “Delivered” need not mean “understood”, just as “tested” need not mean
+“passed”. Adding “probably” does not supply the missing relationship.
+
+Preserve a source's tentative recommendation as tentative under **preserve**.
+When **propose** is authorized, new recommendations may interpret supported
+trade-offs but must not claim an unmeasured advantage. Explain any condition
+under which the available evidence supports a choice. If it supports no such
+choice, give the comparison and its decision limit rather than force a winner.
 
 ## Use the lightest table that fits the reader's task
 
@@ -189,12 +248,43 @@ Use the strongest accurate verb:
 - **targeted:** an intended outcome;
 - **unknown / pending confirmation:** no adequate basis yet.
 
-If cost, duration, headcount, baseline, or success threshold is missing, retain
-`待确认` and state the direct decision dimension it leaves unresolved. Keep the
+If the source explicitly leaves a relevant cost, duration, headcount, baseline,
+or success threshold unknown, retain that uncertainty and its direct decision
+impact. An absent field is not automatically an undecided project commitment:
+surface it as `材料未说明` only for requested gap analysis or when it prevents
+the current reader task. Omit unrelated absences. Keep the
 gap at the source's granularity: do not expand “预算待确认” into conventional
 cost categories, or “验收阈值待确认” into trial size, failure handling, owners,
 and approval steps. Smooth prose must not conceal the gap or manufacture the
 process for closing it.
+
+## A worked decision structure
+
+The following example is synthetic. It demonstrates grouping and information
+gain, not a fixed heading template.
+
+**Source material**
+
+> 甲方案每年 6 万元，能在 3 周内交付并启用，后续由供应商维护。乙方案每年 4 万元，交付并启用要 7 周，后续由本部门维护。目前本部门没有可安排的维护人员。业务要求 4 周内启用，先满足上线时间，再比较费用。两方案都能导出所需报表。建议采用甲方案，请负责人决定是否批准每年 6 万元费用。
+
+**Weak organization**
+
+> 建议采用甲方案。理由有三点：支持报表导出、安排供应商对接、每年费用 6 万元。
+
+This mixes a shared capability, an unstated action and a cost as though they
+were comparable reasons for the choice. Leading with a recommendation has not
+established support for it.
+
+**Complete rewrite**
+
+> 建议采用甲方案，请批准每年 6 万元费用。甲可在 3 周内交付并启用，满足 4 周内启用的要求；乙需要 7 周，无法满足这一时间要求。
+>
+> 甲比乙每年贵 2 万元，但后续由供应商维护。乙需要本部门维护，而目前没有可安排的维护人员。两方案都能导出所需报表，因此这项能力不构成选择差异。
+
+The first paragraph answers the decision and supplies the decisive timing
+comparison. The second adds the cost trade-off, maintenance constraint and
+non-differentiating capability. It does not repeat the recommendation in an
+extra conclusion, nor turn the document into an implementation plan.
 
 ## Learn from complete synthetic examples
 
@@ -214,18 +304,16 @@ project state.
 
 > ## 从巡检记录生成异常检查清单：设备巡检辅助方案说明
 >
-> 这套拟建设的工具，负责从现场提交的巡检记录中标记异常，并生成一份检查清单，再交给设备工程师复核。它不会自动停机，也不会直接下发维修指令。
+> 这套拟建设的工具用于辅助筛查巡检记录。现场人员提交传感器读数、巡检照片和设备编号，系统标记异常记录并生成检查清单；设备工程师复核后，决定是否安排检修。本轮不自动停机，也不自动下发维修指令。
 >
-> 实际使用时，现场人员提交传感器读数、巡检照片和设备编号，系统据此标记异常记录并整理检查清单。设备工程师复核后，再决定是否安排检修。
->
-> 方案希望减少人工筛查巡检记录的时间，但目前还没有用同一批记录比较实际耗时，因此不能把节省时间写成已经验证的效果。预算和验收阈值也尚未确定。
+> 方案希望减少人工筛查巡检记录的时间，但尚未开展同批记录的耗时对比，实际节省时间还未验证。预算和验收阈值也尚未确定。
 >
 > 本文用于说明方案，当前不提交审批请求。
 
-The first paragraph establishes the proposed state and boundary. The second
-turns implementation nouns into a workflow. The third keeps the target beside
-the evidence gap. The last sentence preserves the communication purpose instead
-of manufacturing an approval request.
+The first paragraph explains the supported workflow once, with its proposed
+state and human boundary. The second places the target beside the evidence gap.
+The last sentence preserves the communication purpose. Editing explanations
+stay outside the usable draft.
 
 ### A scenario-led explanation with real materials pending
 
@@ -290,13 +378,13 @@ for a short, bounded explanation, not a conventionally complete proposal.
 >
 > **申请批准：**用六周时间面向 30 名采购专员试运行合同条款提示功能，预算上限 20 万元。
 >
-> 现有材料记录了两项现状：首次审阅时长中位数为 28 分钟；采购专员需要在多个条款库之间查找内容。材料没有证明跨库查找导致了 28 分钟的审阅时长，因此这里只并列说明，不作归因。
+> 目前，首次审阅时长中位数为 28 分钟，采购专员需要在多个条款库之间查找内容。
 >
 > 系统只提示可能需要关注的条款，由采购专员确认后处理，不自动修改或提交合同。参与人员为法务 1 人、采购主管 1 人、工程师 2 人。
 >
-> 试运行前后比较首次审阅时长、人工修改率和漏检数。明确的通过条件有两项：首次审阅时长中位数不高于 15 分钟；没有未经采购专员确认的合同提交。材料没有把人工修改率和漏检数列为通过条件。
+> 试运行前后比较首次审阅时长、人工修改率和漏检数。通过条件有两项：首次审阅时长中位数不高于 15 分钟；没有未经采购专员确认的合同提交。
 >
-> 条款库过期由法务每周复核，权限配置错误由工程师在上线前检查。本次只申请批准上述六周试运行范围和 20 万元预算。
+> 主要风险是条款库过期和权限配置错误，分别由法务每周复核、工程师上线前检查。
 
 The rewrite uses the supplied approval facts without reopening whether the
 budget contains particular cost categories, inventing thresholds for the other
@@ -307,3 +395,91 @@ source is sufficient, completeness means organizing what is there and stopping.
 For an approved plan, the same method improves explanation without reopening
 scope. For a request that explicitly permits plan changes, put new suggestions
 in a separate proposal section and label their effect on the approved baseline.
+
+## Required scenario and appendix boundaries
+
+For a business-facing product or proposal explanation, prefer a concrete use
+scenario near the opening when the source supports it. Distinguish a real case
+from an illustrative scenario and material still to be supplied; an example
+label never licenses invented facts. Give the scenario, steps, and tables
+different jobs instead of repeating the same input-to-output sequence. See
+`decision-documents.md` for a complete example and the sparse-source fallback.
+
+Use an end-to-end scenario only when the supplied sources state or clearly
+entail every consequential actor, input, action, review point, output, and
+boundary included in it. A list of modules or capabilities is not a workflow.
+When the source does not provide the people or sequence, explain the proposal
+at the supported component or capability level; do not turn those omissions
+into invented steps or new `待确认` items merely to make the scenario look
+complete. Include source-supported scope, non-goals, delivery stages,
+acceptance, resources, trade-offs, risks, and fallbacks only at the depth this
+reader's task needs. Do not force every document into the same headings.
+
+Move implementation detail to an appendix only when it does not change the
+decision. A technical constraint stays in the main body when it affects cost,
+schedule, feasibility, risk, quality, compliance, or what must be approved.
+If the source supplies only decision-changing constraints and no implementation
+mechanism, keep the constraints in the body and omit the appendix. Do not invent
+placeholder mechanisms, new checks, owners, optionality, or `待补充` appendix
+items merely to satisfy an appendix request. Do not pad the explanation with
+hypothetical examples of implementation details that the source never supplied.
+Omit the appendix cleanly; do not justify its absence by listing conventional
+fields such as components, interfaces, or deployment methods that the source
+did not mention. When the material supplies only the decision-changing
+constraints, deliver those constraints and stop: do not add `来源没有实现细节`,
+`没有可放入附录的内容`, or any other explanation for the missing appendix.
+
+When the user requests both a standalone decision entry and a preserved
+engineering source, make the short entry self-contained and add an explicit
+pointer such as `完整工程方案见文件二` or the supplied attachment name. Merely
+placing the full plan later in the same response does not create that pointer.
+
+## Complete restructuring: each paragraph contributes something different
+
+This source and edit are entirely synthetic. Use the editing choices, not the
+headings, number of paragraphs or project sequence. The example does not require
+a separate outline, an extra model call or a pilot for another user's plan.
+
+**Repetitive source draft**
+
+> 共享设备预约项目拟提供会议投影仪和便携音箱的预约。预约涉及设备、日期和借用人。前台确认后才能借出，不自动批准。
+>
+> 首期安排东区前台试用两周，只做投影仪。借用人填写日期、设备和姓名，系统显示是否有冲突，前台核对后决定是否借出。前台仍需确认，系统不能直接批准借用。音箱在后续扩展。
+>
+> 验收时查看投影仪预约记录有没有漏记、有没有同一时段重复借出，记录前台处理用时。首期试用两周，只在东区前台进行。
+>
+> 先做投影仪是因为它已经有统一资产编号，音箱的编号仍在核对，无法直接使用同一份设备清单。试用尚未开始，不能确认是否节省时间。
+>
+> 业务要提供投影仪编号清单与可借时段。前台负责人安排回看人。预算与上线日期待确认，最终验收门槛也未确定。
+>
+> 本项目保持人工确认，不会自动批准借用。完整工程附录另列预约表字段、冲突接口、操作日志与部署步骤；已知这些实现细节不改变本次范围、成本或验收条件。本文只供确认试用安排，不申请扩大范围。
+
+**Reader request**
+
+> 给业务负责人一份可以独立发送的方案说明，精炼但不要丢失理由、限制和待确认项；工程附录继续保留。
+
+**Complete edit**
+
+> # 设备预约：先在东区前台试用投影仪登记
+>
+> 设备预约项目拟覆盖投影仪和便携音箱，首期在东区前台试用投影仪登记两周。投影仪已有统一资产编号，音箱编号仍在核对，因此先验证投影仪这一类。本文用于确认试用安排，不申请扩大范围。
+>
+> 借用人填写设备、日期和姓名，系统提示冲突，由前台核对后决定是否借出；系统不自动批准。试用期间检查预约有无漏记、同一时段有无重复借出，并记录前台处理用时。试用尚未开始，能否节省时间仍待验证，最终验收门槛也未确定。
+>
+> 业务需提供投影仪编号清单与可借时段，前台负责人安排回看人。预算与上线日期待确认。预约字段、接口、操作日志和部署步骤见随附的《完整工程附录》。
+
+**What changed and why**
+
+| Source passage | Editing choice | Information preserved |
+| --- | --- | --- |
+| Scope in paragraphs 1–2; reason in paragraph 4 | Put the bounded proposal beside its actual reason | Both device types, first scope, duration, location and different identifier states |
+| Human approval stated three times | Keep it with the action it governs | Who decides, what the system does and what it cannot do |
+| Trial duration and place repeated in acceptance | Keep the scope once; acceptance contributes observations | Missing bookings, duplicate loans and handling time remain separate checks |
+| Intended time savings and not-yet-started status | Put them together to limit the outcome claim | No measured improvement is implied; no target is invented |
+| Preparation and implementation mechanics | Keep actionable inputs in the body; name the attached appendix | Owner, inputs, unknowns and the standalone document's route to detail |
+
+The compression comes from assigning each fact a useful place, not deleting
+conditions or replacing full sentences with terse labels. A repeated noun can
+serve different actions: the trial's human approval and the acceptance check
+are both needed. A different source may need a different structure or retain
+technical detail in the main text when it changes the decision.

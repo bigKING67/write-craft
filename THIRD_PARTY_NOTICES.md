@@ -14,6 +14,12 @@ package. No absence of an explicit license is interpreted as permission to copy.
 
 ## Reference-only or independently re-expressed sources
 
+- **lijigang, `ljg-skills`** — repository MIT, Copyright (c) 2026 lijigang.
+  Chinese editing and explanatory-writing methods were independently expressed
+  after reviewing `ljg-writes` and selected `ljg-paper` guidance at
+  `fdea0bea5133246de418d19015f65eeb18699623`. No upstream text, templates, or
+  scripts are vendored. `ljg-plain` remains supplementary reference only.
+  Exact paths, license link, and exclusions are in `docs/upstream-absorption.md`.
 - **Anthropic, `skills`, `doc-coauthoring`** — the reviewed source path does
   not declare reuse terms. Write Craft independently expresses the general
   ideas of context-aware drafting and fresh-reader testing; no text is copied.
@@ -27,3 +33,8 @@ package. No absence of an explicit license is interpreted as permission to copy.
 
 Exact revisions and path-level decisions are recorded in
 `upstreams.lock.json` and `docs/upstream-absorption.md`.
+
+- **Barbara Minto, public Pyramid Principle concept guidance** — reviewed
+  https://www.barbaraminto.com/concept on 2026-09-26. Grouping facts into
+  supported insights informed independently written decision-structure guidance.
+  No book, course, website text or proprietary exercises are reproduced.
